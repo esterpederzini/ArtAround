@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Editor Item – ArtAround</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.min.css"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body class="d-flex flex-column min-vh-100">
+    <nav class="navbar navbar-expand-lg aa-navbar">
+      <div class="container">
+        <a class="navbar-brand" href="/">Art<span>Around</span></a>
+        <button
+          class="navbar-toggler border-0"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navMain"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navMain">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
+            <li class="nav-item">
+              <a class="nav-link" href="/dashboard">Dashboard</a>
+            </li>
+            <li class="nav-item d-none id-autore-nav">
+              <a class="nav-link" href="/editor-visita">Editor Visita</a>
+            </li>
+            <li class="nav-item d-none id-autore-nav">
+              <a class="nav-link active" href="/editor-item">Editor Item</a>
+            </li>
+            <li class="nav-item d-none" id="navLinkNavigator">
+              <a
+                class="nav-link"
+                href="/navigator/"
+                style="color: var(--aa-gold); fw-bold"
+                >Navigator</a
+              >
+            </li>
+          </ul>
+          <div class="d-flex align-items-center gap-2">
+            <span id="utenteInfo" class="text-white-50 small"></span>
+            <button
+              class="btn-login d-none"
+              id="btnLogin"
+              onclick="apriLogin()"
+            >
+              <i class="bi bi-person"></i> Accedi
+            </button>
+            <button
+              class="btn-aa-danger d-none"
+              id="btnLogout"
+              onclick="logout()"
+            >
+              <i class="bi bi-box-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container py-4 flex-grow-1 d-none" id="mainContent">
+      <div class="row g-4">
+        <div class="col-lg-8">
+          <div class="aa-card">
+            <div class="aa-card-header">
+              <i class="bi bi-plus-circle"></i>
+              <span id="formTitolo"> Nuovo Contenuto (Item)</span>
+              <span id="operaStatoBadge" class="badge ms-2 bg-secondary d-none"
+                >Nuova Opera</span
+              >
+            </div>
+            <div class="aa-card-body">
+              <div class="aa-sidebar-title" style="font-size: 0.72rem">
+                <i class="bi bi-fingerprint"></i> Selezione ed Identificazione
+                Opera
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <div class="aa-form-group">
+                    <label class="aa-label"
+                      >Seleziona Opera dal Museo
+                      <span class="required">*</span></label
+                    >
+                    <select id="operaSelect" class="aa-select">
+                      <option value="">
+                        -- Caricamento opere in corso... --
+                      </option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="aa-form-group">
+                    <label class="aa-label">Museo Attivo</label>
+                    <input
+                      type="text"
+                      id="museo"
+                      class="aa-input"
+                      readonly
+                      style="
+                        background-color: var(--aa-cream);
+                        cursor: not-allowed;
+                        font-weight: 600;
+                      "
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <input type="hidden" id="itemId" value="" />
+                </div>
+                <div class="col-md-4">
+                  <input type="hidden" id="itemId" value="" />
+                  <input type="hidden" id="operaId" value="" />
+                </div>
+                <div class="col-md-8">
+                  <input type="hidden" id="operaTitoloUfficiale" value="" />
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="aa-sidebar-title" style="font-size: 0.72rem">
+                <i class="bi bi-bank"></i> Dettagli Storico-Artistici (Scheda
+                Tecnica)
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <div class="aa-form-group">
+                    <label class="aa-label">Artista / Maestranze</label>
+                    <input
+                      type="text"
+                      id="artista"
+                      class="aa-input"
+                      placeholder="Es. Girolamo Mazzola Bedoli"
+                    />
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="aa-form-group">
+                    <label class="aa-label">Stile</label>
+                    <input
+                      type="text"
+                      id="stile"
+                      class="aa-input"
+                      placeholder="Es. Manierismo"
+                    />
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="aa-form-group">
+                    <label class="aa-label">Periodo</label>
+                    <input
+                      type="text"
+                      id="periodo"
+                      class="aa-input"
+                      placeholder="Es. XVI Secolo"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="aa-sidebar-title" style="font-size: 0.72rem">
+                <i class="bi bi-info-circle"></i> Informazioni Principali
+                dell'Item
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-8">
+                  <div class="aa-form-group">
+                    <label class="aa-label"
+                      >Titolo della Spiegazione (Item)
+                      <span class="required">*</span></label
+                    >
+                    <input
+                      type="text"
+                      id="titolo"
+                      class="aa-input"
+                      placeholder="Es. Introduzione semplice per bambini"
+                    />
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="aa-form-group">
+                    <label class="aa-label">Categoria</label>
+                    <select id="categoria" class="aa-select">
+                      <option value="pittura">Pittura</option>
+                      <option value="scultura">Scultura</option>
+                      <option value="decorativa">Decorativa</option>
+                      <option value="arte_antica">Arte Antica</option>
+                      <option value="archeologia">Archeologia</option>
+                      <option value="manoscritto">Manoscritto</option>
+                      <option value="altro">Altro</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <div class="aa-form-group">
+                    <label class="aa-label"
+                      >Testo della Spiegazione Audio
+                      <span class="required">*</span></label
+                    >
+                    <textarea
+                      id="descrizione"
+                      class="aa-textarea"
+                      rows="5"
+                      placeholder="Scrivi qui il testo che verrà riprodotto dall'audioguida..."
+                    ></textarea>
+                    <div class="text-end text-slate small mt-1">
+                      Caratteri: <span id="charCount">0</span> | Profondità
+                      stimata: <strong id="profonditaPreview">–</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="aa-sidebar-title" style="font-size: 0.72rem">
+                <i class="bi bi-tags"></i> Caratterizzazione Audioguida
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <div class="aa-form-group">
+                    <label class="aa-label"
+                      >Linguaggio / Target
+                      <span class="required">*</span></label
+                    >
+                    <select id="linguaggio" class="aa-select">
+                      <option value="infantile">Infantile</option>
+                      <option value="medio" selected>Medio</option>
+                      <option value="avanzato">Avanzato</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="aa-form-group">
+                    <label class="aa-label"
+                      >Lunghezza Traccia <span class="required">*</span></label
+                    >
+                    <select id="lunghezza" class="aa-select">
+                      <option value="3s">3 secondi (Snapshot)</option>
+                      <option value="15s">15 secondi (Intro)</option>
+                      <option value="1m">1 minuto (Standard)</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <div class="aa-form-group">
+                    <label class="aa-label"
+                      >URL Immagine di Riconoscimento</label
+                    >
+                    <input
+                      type="text"
+                      id="immagineUrl"
+                      class="aa-input"
+                      placeholder="https://link-immagine.com/opera.jpg"
+                    />
+                  </div>
+                </div>
+                <div class="col-12">
+                  <div class="aa-form-group">
+                    <label class="aa-label">Tags (separati da virgola)</label>
+                    <input
+                      type="text"
+                      id="tags"
+                      class="aa-input"
+                      placeholder="manierismo, domenicani, ritratto"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="aa-card mb-3">
+            <div class="aa-card-header">
+              <i class="bi bi-cloud-upload"></i> Mercato & Licenza
+            </div>
+            <div class="aa-card-body">
+              <div class="aa-form-group">
+                <label class="aa-label"
+                  >Tipo Licenza <span class="required">*</span></label
+                >
+                <select id="licenzaTipo" class="aa-select">
+                  <option value="gratuito">Contenuto Libero</option>
+                  <option value="CC-BY">CC-BY</option>
+                  <option value="CC-BY-SA">CC-BY-SA</option>
+                  <option value="proprietario">Proprietario / Riservato</option>
+                </select>
+              </div>
+              <div class="aa-form-group">
+                <label class="aa-label">Note Licenza</label>
+                <input
+                  type="text"
+                  id="licenzaNote"
+                  class="aa-input"
+                  placeholder="Es. Proprietà intellettuale del museo"
+                />
+              </div>
+              <div class="aa-form-group">
+                <label class="aa-label">Prezzo Vendita Singola (€)</label>
+                <input
+                  type="number"
+                  id="prezzo"
+                  class="aa-input"
+                  value="0"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              <div class="d-flex align-items-center gap-2 mb-3">
+                <input
+                  type="checkbox"
+                  id="pubblicato"
+                  class="form-check-input"
+                  style="width: 18px; height: 18px"
+                  checked
+                />
+                <label
+                  for="pubblicato"
+                  class="aa-label mb-0"
+                  style="text-transform: none; letter-spacing: 0"
+                  >Pubblica immediatamente nel catalogo</label
+                >
+              </div>
+
+              <input type="hidden" id="itemId" />
+              <input type="hidden" id="autoreId" />
+              <input type="hidden" id="profonditaContenuto" value="standard" />
+
+              <button class="btn-aa-primary w-100 mb-2" onclick="salvaItem()">
+                <i class="bi bi-floppy"></i> Salva Item
+              </button>
+              <button class="btn-aa-outline w-100" onclick="resetForm()">
+                <i class="bi bi-arrow-counterclockwise"></i> Svuota Campi
+              </button>
+            </div>
+          </div>
+
+          <div class="aa-card mt-3">
+            <div class="aa-card-header">
+              <i class="bi bi-eye"></i> Anteprima Card
+            </div>
+            <div class="aa-card-body p-2">
+              <div
+                class="aa-item-card border m-0"
+                style="background: var(--aa-cream)"
+              >
+                <div
+                  id="prevImg"
+                  class="aa-item-placeholder"
+                  style="height: 120px"
+                >
+                  🖼️
+                </div>
+                <div class="card-body p-2">
+                  <div
+                    class="card-title"
+                    id="prevTitolo"
+                    style="font-size: 0.9rem"
+                  >
+                    Titolo item
+                  </div>
+                  <div class="d-flex gap-1 mb-2">
+                    <span id="prevLang" class="aa-badge">medio</span>
+                    <span id="prevLen" class="aa-badge aa-badge-len">3s</span>
+                  </div>
+                  <p
+                    class="card-text small"
+                    id="prevDesc"
+                    style="font-size: 0.75rem"
+                  >
+                    La descrizione apparirà qui...
+                  </p>
+                </div>
+                <div
+                  class="card-footer p-2 d-flex justify-content-between align-items-center"
+                >
+                  <span id="prevPrice" class="aa-badge aa-badge-free"
+                    >Gratuito</span
+                  >
+                  <span
+                    id="prevLicenza"
+                    class="text-slate"
+                    style="font-size: 0.65rem"
+                    >gratuito</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/editor-item.js"></script>
+
+    <div id="loginModal" class="aa-modal-overlay d-none">
+      <div class="aa-modal" style="max-width: 420px">
+        <div class="aa-modal-header">
+          <h4>Accedi ad ArtAround</h4>
+          <button class="aa-modal-close" onclick="chiudiLogin()">✕</button>
+        </div>
+        <div class="aa-modal-body">
+          <div class="aa-form-group">
+            <label class="aa-label">Username</label>
+            <input
+              type="text"
+              id="loginUsername"
+              class="aa-input"
+              placeholder="es. autore1"
+            />
+          </div>
+          <div class="aa-form-group">
+            <label class="aa-label">Password</label>
+            <input
+              type="password"
+              id="loginPassword"
+              class="aa-input"
+              placeholder="••••••••"
+            />
+          </div>
+        </div>
+        <div class="aa-modal-footer">
+          <button class="btn-aa-outline" onclick="chiudiLogin()">
+            Annulla
+          </button>
+          <button class="btn-aa-primary" onclick="eseguiLogin()">Accedi</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="aa-toast-container" id="toastContainer"></div>
+  </body>
+</html>

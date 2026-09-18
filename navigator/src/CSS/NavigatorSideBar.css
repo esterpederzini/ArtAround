@@ -1,0 +1,121 @@
+
+:root {
+  --sidebar-collapsed-width: 3.75rem; 
+  --sidebar-expanded-width-mobile: 14rem; 
+  --sidebar-expanded-width-desktop: 17.5rem; 
+}
+
+.sidebar {
+  background-color: transparent;
+  transition:
+    width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 10;
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  background-color: red !important;
+}
+
+.sidebar.expanded {
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  width: var(--sidebar-expanded-width-mobile);
+  border-right: 1px solid rgba(255, 255, 255, 0.25);
+  background-image: linear-gradient(to right, #ffecd2 0%, #dbb280 100%);
+}
+
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+.sidebar-header {
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar.expanded .sidebar-header {
+  justify-content: flex-start;
+  padding-left: 1rem;
+}
+
+.nav-btn {
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1.5rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar i,
+.link-text {
+  color: #ffffff !important;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  padding: 0.85rem 1.1rem;
+  cursor: pointer;
+  white-space: nowrap;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  transition: background-color 0.2s ease;
+}
+
+.nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.nav-item:hover i {
+  transform: scale(1.08);
+}
+
+.nav-item i {
+  font-size: 1.3rem;
+  min-width: 1.85rem;
+  text-align: center;
+}
+
+.link-text {
+  font-size: 0.95rem;
+  margin-left: 0.6rem;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+@media (min-width: 768px) {
+  .sidebar.expanded {
+    width: var(--sidebar-expanded-width-desktop);
+  }
+  .nav-item {
+    padding: 1rem 1.25rem;
+  }
+  .link-text {
+    font-size: 1rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .nav-item {
+    padding: 1.1rem 1.4rem; 
+  }
+}

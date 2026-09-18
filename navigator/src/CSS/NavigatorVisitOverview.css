@@ -1,0 +1,280 @@
+@import url("https://fonts.googleapis.com/css2?family=Gravitas+One&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..900;1,300..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap");
+
+.full-container {
+  min-height: 100vh;
+  background-color: #242326;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-bottom: 10vh;
+}
+
+.itinerary-row {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.itinerary-row:active {
+  opacity: 0.7;
+}
+
+.list-num-circle {
+  background-color: #3a3a3c;
+  width: 10vw;
+  height: 10vw;
+  max-width: 40px;
+  max-height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: "Gravitas One", serif;
+  font-weight: 400;
+  color: white;
+  border-radius: 50% !important;
+  z-index: 2;
+  position: relative;
+}
+
+.list-num-circle.active {
+  background-color: #e18f37;
+}
+
+.timeline-line {
+  position: absolute;
+  top: 47px;
+  bottom: 10px;
+  width: 2px;
+  background-color: #3a3a3c;
+  z-index: 1;
+}
+
+.itinerary-card {
+  background-color: #2c2c2e !important;
+  border-radius: 15px !important;
+  margin-left: 0.5rem;
+  overflow: hidden;
+  border: 1px solid #3a3a3c !important;
+}
+
+.img-list-new {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.img-list {
+  width: 27vh !important;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
+.author {
+  font-family: "Rubik", sans-serif;
+  font-weight: 400;
+  font-size: 0.8rem !important;
+  margin: 0 !important;
+  color: black !important;
+}
+
+.title {
+  font-family: "Raleway", sans-serif;
+  font-style: normal;
+  font-size: 0.9rem;
+  color: #e0e0e0 !important;
+}
+
+.opera-title {
+  color: #faf7f1 !important;
+  font-weight: 700;
+  font-size: 1.2rem !important;
+  margin-bottom: 2px;
+}
+
+.audio-info {
+  font-size: 0.75rem;
+  color: #e18f37;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+.itinerary-header {
+  padding-left: 1vw;
+  margin-bottom: 2vh;
+}
+
+.itinerary-header h3 {
+  color: white;
+  font-family: "Rubik", sans-serif;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.start-visit-btn {
+  background-color: #e18f37 !important;
+  border: none !important;
+  border-radius: 15px !important;
+  padding: 15px !important;
+  font-family: "Rubik", sans-serif;
+  letter-spacing: 1px;
+  font-size: 0.9rem;
+  transition: transform 0.2s ease;
+}
+
+.start-visit-btn:active {
+  transform: scale(0.96);
+  background-color: #e18f37 !important;
+}
+
+.play-icon-circle {
+  background-color: white;
+  color: #e18f37;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.play-icon-circle i {
+  font-size: 1.2rem;
+  margin-left: 2px;
+}
+
+.museum-modal-overview .modal-content {
+  background: rgba(36, 35, 38, 0.8) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 1.2rem !important;
+  padding: 1.5rem !important;
+}
+
+.museum-modal-content-overview {
+  background: transparent !important;
+  text-align: center;
+  color: #ffffff !important;
+  padding: 0 !important;
+}
+
+.museum-modal-icon-overview {
+  font-size: 3rem;
+  color: #e18f37;
+  margin-bottom: 1rem;
+}
+
+.museum-modal-title-overview {
+  font-family: "Rubik", sans-serif;
+  font-weight: 700;
+  font-size: 1.3rem;
+  margin-bottom: 0.5rem;
+  color: #ffffff !important;
+}
+
+.museum-modal-text-overview {
+  font-family: "Rubik", sans-serif;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.7) !important;
+  margin-bottom: 1.5rem;
+}
+
+.museum-modal-actions-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.btn-overview-confirm {
+  background-color: #e18f37 !important;
+  color: #ffffff !important;
+  border: none;
+  padding: 10px;
+  border-radius: 25px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.btn-overview-confirm:hover {
+  background-color: #c9792c !important;
+}
+
+.btn-overview-cancel {
+  background-color: transparent !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  padding: 10px;
+  border-radius: 25px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-overview-cancel:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: #ffffff !important;
+}
+
+.list-num-circle.furthest {
+  box-shadow:
+    0 0 0 3px rgba(225, 143, 55, 0.4),
+    0 0 0 6px rgba(225, 143, 55, 0.15);
+}
+
+.timeline-line.reached {
+  background-color: #e18f37;
+}
+
+.content-wrapper {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 769px) {
+  .content-wrapper {
+    max-width: 720px;
+    padding-top: 1.5rem;
+  }
+
+  .list-num-circle {
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+    font-size: 0.95rem !important;
+  }
+
+  .timeline-line {
+    top: 2.5rem;
+  }
+
+  .btn-container-desktop {
+    max-width: 320px;
+    margin: 0 auto 2rem auto;
+  }
+
+  .start-visit-btn {
+    padding: 12px 20px !important;
+  }
+
+  .itinerary-card {
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .itinerary-card:hover {
+    transform: translateX(6px);
+    border-color: rgba(225, 143, 55, 0.4) !important;
+    background-color: #323235 !important;
+  }
+
+  .img-list-new {
+    max-width: 90px;
+    border-radius: 8px;
+  }
+}

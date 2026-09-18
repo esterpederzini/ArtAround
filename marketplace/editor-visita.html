@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Editor Visita – ArtAround</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.min.css"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+
+  <body class="d-flex flex-column min-vh-100">
+    <nav class="navbar navbar-expand-lg aa-navbar">
+      <div class="container">
+        <a class="navbar-brand" href="/">Art<span>Around</span></a>
+        <button
+          class="navbar-toggler border-0"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navMain"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navMain">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
+            <li class="nav-item">
+              <a class="nav-link" href="/dashboard">Dashboard</a>
+            </li>
+            <li class="nav-item d-none id-autore-nav">
+              <a class="nav-link active" href="/editor-visita">Editor Visita</a>
+            </li>
+            <li class="nav-item d-none id-autore-nav">
+              <a class="nav-link" href="/editor-item">Editor Item</a>
+            </li>
+            <li class="nav-item d-none" id="navLinkNavigator">
+              <a
+                class="nav-link"
+                href="/navigator/"
+                style="color: var(--aa-gold); fw-bold"
+                >Navigator</a
+              >
+            </li>
+          </ul>
+          <div class="d-flex align-items-center gap-2">
+            <span id="utenteInfo" class="text-white-50 small"></span>
+            <button
+              class="btn-login d-none"
+              id="btnLogin"
+              onclick="apriLogin()"
+            >
+              <i class="bi bi-person"></i> Accedi
+            </button>
+            <button
+              class="btn-aa-danger d-none"
+              id="btnLogout"
+              onclick="logout()"
+            >
+              <i class="bi bi-box-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div
+      id="editorMainContainer"
+      class="container-fluid py-4 px-4 flex-grow-1 d-none"
+    >
+      <div class="row g-4">
+        <div class="col-lg-5 col-xl-4">
+          <div class="aa-card">
+            <div class="aa-card-header">
+              <i class="bi bi-pencil-square"></i>
+              <span id="editorTitolo">Nuova Visita</span>
+            </div>
+            <div class="aa-card-body">
+              <div class="aa-form-group">
+                <label class="aa-label"
+                  >Titolo Visita <span class="required">*</span></label
+                >
+                <input
+                  type="text"
+                  id="visitaTitolo"
+                  class="aa-input"
+                  placeholder="Es. I Capolavori del Museo Egizio"
+                />
+              </div>
+
+              <div class="aa-form-group">
+                <label class="aa-label">Museo</label>
+                <input
+                  type="text"
+                  id="visitaMuseo"
+                  class="aa-input"
+                  value=""
+                  readonly
+                  style="background-color: #f5f5f5; cursor: not-allowed"
+                />
+              </div>
+
+              <div class="aa-form-group">
+                <label class="aa-label"
+                  >Livello Base della Guida
+                  <span class="required">*</span></label
+                >
+                <select id="visitaLivelloBase" class="aa-select">
+                  <option value="infantile">Guida Infantile</option>
+                  <option value="medio">Guida Media</option>
+                  <option value="avanzato" selected>Guida Avanzata</option>
+                </select>
+              </div>
+
+              <div class="aa-form-group">
+                <label class="aa-label">Descrizione Generale</label>
+                <textarea
+                  id="visitaDescrizione"
+                  class="aa-textarea"
+                  rows="3"
+                  placeholder="Descrivi brevemente il percorso..."
+                ></textarea>
+              </div>
+
+              <div class="row g-2">
+                <div class="col-6 solo-autore">
+                  <label class="aa-label" for="visitaTag">Tag</label>
+                  <input
+                    type="text"
+                    id="visitaTag"
+                    class="aa-input"
+                    placeholder="es. rinascimento, firenze, scultura (separati da virgola)"
+                  />
+                </div>
+                <div class="col-6">
+                  <div class="aa-form-group">
+                    <label class="aa-label">Durata Totale (min)</label>
+                    <input
+                      type="number"
+                      id="visitaDurata"
+                      class="aa-input"
+                      value="60"
+                      min="5"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label
+                  for="visitaImmagine"
+                  class="form-label small text-muted"
+                  style="font-weight: 600"
+                  >URL Immagine Copertina</label
+                >
+                <input
+                  type="text"
+                  id="visitaImmagine"
+                  class="aa-input"
+                  placeholder="Es: /img/mio_tour.jpg o un link web..."
+                  style="font-size: 0.85rem"
+                />
+              </div>
+
+              <div class="divider solo-autore"></div>
+              <div
+                class="aa-sidebar-title solo-autore"
+                style="font-size: 0.72rem"
+              >
+                <i class="bi bi-shield-lock"></i> Pubblicazione & Licenza
+              </div>
+
+              <div class="row g-2">
+                <div class="col-6 solo-autore">
+                  <div class="aa-form-group">
+                    <label class="aa-label">Tipo Licenza</label>
+                    <select id="visitaLicenza" class="aa-select">
+                      <option value="gratuito">Gratuito</option>
+                      <option value="CC-BY">CC-BY</option>
+                      <option value="CC-BY-SA">CC-BY-SA</option>
+                      <option value="CC-BY-NC">CC-BY-NC</option>
+                      <option value="proprietario">Proprietario</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="col-6 solo-autore">
+                  <div class="aa-form-group">
+                    <label class="aa-label">Prezzo (€)</label>
+                    <input
+                      type="number"
+                      id="visitaPrezzo"
+                      class="aa-input"
+                      value="0"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="d-flex align-items-center gap-2 mb-3 solo-autore">
+                <input
+                  type="checkbox"
+                  id="visitaPubblica"
+                  class="form-check-input"
+                  style="width: 18px; height: 18px"
+                />
+                <label
+                  for="visitaPubblica"
+                  class="aa-label mb-0"
+                  style="text-transform: none; letter-spacing: 0"
+                >
+                  Pubblica nel marketplace
+                </label>
+              </div>
+
+              <div class="aa-form-group d-none">
+                <label class="aa-label">Autore della Visita</label>
+                <input type="hidden" id="visitaAutore" value="" />
+              </div>
+              <input type="hidden" id="visitaId" />
+
+              <div class="d-flex gap-2 mt-3">
+                <button
+                  class="btn-aa-primary flex-grow-1"
+                  onclick="salvaVisita()"
+                >
+                  <i class="bi bi-floppy"></i> Salva Visita
+                </button>
+                <button class="btn-aa-outline" onclick="resetEditor()">
+                  <i class="bi bi-x"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-7 col-xl-8">
+          <div class="row g-4">
+            <div class="col-12">
+              <div class="aa-card">
+                <div
+                  class="aa-card-header d-flex justify-content-between align-items-center"
+                >
+                  <span
+                    ><i class="bi bi-list-ol"></i> Percorso della Visita
+                    (Tappe)</span
+                  >
+                  <div class="d-flex align-items-center gap-2">
+                    <span
+                      id="durataCalcolata"
+                      class="badge bg-secondary me-2"
+                      style="font-size: 0.78rem"
+                      >Durata: ~0 min</span
+                    >
+                    <span class="text-slate small" id="countItems"
+                      >0 item selezionati</span
+                    >
+                  </div>
+                </div>
+                <div class="aa-card-body">
+                  <div id="dndList" class="aa-dnd-list">
+                    <div class="aa-empty" style="padding: 1.5rem">
+                      <div class="aa-empty-icon" style="font-size: 2rem">
+                        📭
+                      </div>
+                      <p class="mb-0" style="font-size: 0.85rem">
+                        Aggiungi item dal catalogo sottostante per creare il
+                        percorso.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <div class="aa-card">
+                <div
+                  class="aa-card-header d-flex justify-content-between align-items-center"
+                >
+                  <span
+                    ><i class="bi bi-collection"></i> Catalogo Contenuti
+                    Disponibili</span
+                  >
+                  <div class="aa-search-wrap" style="width: 260px">
+                    <i class="bi bi-search search-icon"></i>
+                    <input
+                      type="text"
+                      id="cercaCatalogo"
+                      class="aa-input"
+                      placeholder="Cerca per titolo, artista, stile..."
+                      style="
+                        font-size: 0.82rem;
+                        padding: 0.4rem 0.4rem 0.4rem 30px;
+                      "
+                    />
+                  </div>
+                </div>
+                <div class="aa-card-body p-2">
+                  <div
+                    id="catalogoItems"
+                    style="max-height: 400px; overflow-y: auto; padding: 6px"
+                  >
+                    <div class="text-center py-4 text-muted small">
+                      <div class="aa-spinner mb-2"></div>
+                      Caricamento catalogo...
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="aa-toast-container" id="toastContainer"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/editor-visita.js"></script>
+
+    <div id="loginModal" class="aa-modal-overlay d-none">
+      <div class="aa-modal" style="max-width: 420px">
+        <div class="aa-modal-header">
+          <h4>Accedi ad ArtAround</h4>
+          <button class="aa-modal-close" onclick="chiudiLogin()">✕</button>
+        </div>
+        <div class="aa-modal-body">
+          <div class="aa-form-group">
+            <label class="aa-label">Username</label>
+            <input
+              type="text"
+              id="loginUsername"
+              class="aa-input"
+              placeholder="es. autore1"
+            />
+          </div>
+          <div class="aa-form-group">
+            <label class="aa-label">Password</label>
+            <input
+              type="password"
+              id="loginPassword"
+              class="aa-input"
+              placeholder="••••••••"
+            />
+          </div>
+        </div>
+        <div class="aa-modal-footer">
+          <button class="btn-aa-outline" onclick="chiudiLogin()">
+            Annulla
+          </button>
+          <button class="btn-aa-primary" onclick="eseguiLogin()">Accedi</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dashboard – ArtAround</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.min.css"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+      .aa-scrollable-personal-container {
+        max-height: 400px;
+        overflow-y: auto;
+        padding-right: 4px;
+        margin-bottom: 1.5rem;
+        border: 1px solid var(--aa-border-soft, #e2e8f0);
+        border-radius: 8px;
+        background-color: #faf9f6;
+      }
+      .aa-scrollable-personal-container::-webkit-scrollbar {
+        width: 6px;
+      }
+      .aa-scrollable-personal-container::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .aa-scrollable-personal-container::-webkit-scrollbar-thumb {
+        background-color: var(--aa-slate, #a0aec0);
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body class="d-flex flex-column min-vh-100">
+    <nav class="navbar navbar-expand-lg aa-navbar">
+      <div class="container">
+        <a class="navbar-brand" href="/">Art<span>Around</span></a>
+        <button
+          class="navbar-toggler border-0"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navMain"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navMain">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
+            <li class="nav-item">
+              <a class="nav-link active" href="/dashboard">Dashboard</a>
+            </li>
+            <li class="nav-item d-none id-autore-nav">
+              <a class="nav-link" href="/editor-visita">Editor Visita</a>
+            </li>
+            <li class="nav-item d-none id-autore-nav">
+              <a class="nav-link" href="/editor-item">Editor Item</a>
+            </li>
+            <li class="nav-item d-none" id="navLinkNavigator">
+              <a
+                class="nav-link"
+                href="/navigator/"
+                style="color: var(--aa-gold); font-weight: bold"
+                >Navigator</a
+              >
+            </li>
+          </ul>
+          <div class="d-flex align-items-center gap-2">
+            <span id="utenteInfo" class="text-white-50 small"></span>
+
+            <button
+              class="btn-login d-none"
+              id="btnLogin"
+              onclick="apriLogin()"
+            >
+              <i class="bi bi-person"></i> Accedi
+            </button>
+
+            <button
+              class="btn-aa-danger d-none"
+              id="btnLogout"
+              onclick="logout()"
+            >
+              <i class="bi bi-box-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container py-4 px-4 flex-grow-1">
+      <div class="row g-4">
+        <div class="col-lg-2 col-md-3">
+          <div class="aa-sidebar-wrapper">
+            <div
+              class="d-flex justify-content-between align-items-center d-md-none bg-cream-dark p-3 rounded mb-2"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseFiltri"
+              aria-expanded="false"
+              aria-controls="collapseFiltri"
+              style="cursor: pointer"
+              onclick="ruotaFrecciaFiltri()"
+            >
+              <h5
+                class="m-0 text-uppercase tracking-wider"
+                style="
+                  font-size: 0.8rem;
+                  font-weight: 700;
+                  color: var(--aa-charcoal);
+                "
+              >
+                <i class="bi bi-funnel"></i> Filtri di Ricerca
+              </h5>
+              <i
+                class="bi bi-chevron-down text-slate transition-transform"
+                id="frecciaFiltri"
+                style="font-size: 1.1rem"
+              ></i>
+            </div>
+
+            <div class="collapse d-md-block" id="collapseFiltri">
+              <div class="aa-sidebar-section pt-2 pt-md-0">
+                <div class="aa-sidebar-title d-none d-md-block">
+                  <i class="bi bi-funnel"></i> Filtri
+                </div>
+
+                <div class="mb-3">
+                  <div class="aa-sidebar-title" style="font-size: 0.7rem">
+                    Museo
+                  </div>
+                  <div id="filtroMusei">
+                    <button class="aa-filter-btn active" data-museo="">
+                      Tutti
+                    </button>
+                  </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="mb-3">
+                  <div class="aa-sidebar-title" style="font-size: 0.7rem">
+                    Linguaggio
+                  </div>
+                  <button class="aa-filter-btn active" data-lang="">
+                    Tutti
+                  </button>
+                  <button class="aa-filter-btn" data-lang="infantile">
+                    Infantile
+                  </button>
+                  <button class="aa-filter-btn" data-lang="medio">Medio</button>
+                  <button class="aa-filter-btn" data-lang="avanzato">
+                    Avanzato
+                  </button>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="mb-3">
+                  <div class="aa-sidebar-title" style="font-size: 0.7rem">
+                    Prezzo
+                  </div>
+                  <button class="aa-filter-btn active" data-prezzo="">
+                    Tutti
+                  </button>
+                  <button class="aa-filter-btn" data-prezzo="free">
+                    Gratuiti
+                  </button>
+                  <button class="aa-filter-btn" data-prezzo="paid">
+                    A pagamento
+                  </button>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="mb-3">
+                  <div class="aa-sidebar-title" style="font-size: 0.7rem">
+                    Categoria
+                  </div>
+                  <button class="aa-filter-btn active" data-cat="">
+                    Tutte
+                  </button>
+                  <button class="aa-filter-btn" data-cat="pittura">
+                    Pittura
+                  </button>
+                  <button class="aa-filter-btn" data-cat="scultura">
+                    Scultura
+                  </button>
+                  <button class="aa-filter-btn" data-cat="decorativa">
+                    Decorativa
+                  </button>
+                  <button class="aa-filter-btn" data-cat="arte_antica">
+                    Arte Antica
+                  </button>
+                  <button class="aa-filter-btn" data-cat="altro">Altro</button>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="mb-3">
+                  <div class="aa-sidebar-title" style="font-size: 0.7rem">
+                    Stile / Periodo
+                  </div>
+                  <button class="aa-filter-btn active" data-stile="">
+                    Tutti
+                  </button>
+                  <button class="aa-filter-btn" data-stile="XIX Dinastia">
+                    XIX Dinastia
+                  </button>
+                  <button class="aa-filter-btn" data-stile="XVIII Dinastia">
+                    XVIII Dinastia
+                  </button>
+                  <button
+                    class="aa-filter-btn"
+                    data-stile="Regno di Ramesse II"
+                  >
+                    Regno di Ramesse II
+                  </button>
+                  <button class="aa-filter-btn" data-stile="Nuovo Regno">
+                    Nuovo Regno
+                  </button>
+                </div>
+
+                <div class="divider"></div>
+
+                <button
+                  class="btn-aa-outline w-100 mb-3"
+                  onclick="resetFiltri()"
+                  style="font-size: 0.8rem"
+                >
+                  <i class="bi bi-x-circle"></i> Reset
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-10 col-md-9">
+          <div class="aa-tabs" id="tabsMain">
+            <button
+              class="aa-tab active"
+              data-tab="items"
+              onclick="switchTab('items', this)"
+            >
+              <i class="bi bi-collection"></i> Catalogo Item
+            </button>
+            <button
+              class="aa-tab"
+              data-tab="visite"
+              id="tabVisiteBtn"
+              onclick="switchTab('visite', this)"
+            >
+              <i class="bi bi-map"></i> Visite
+            </button>
+            <button
+              class="aa-tab d-none"
+              data-tab="miei"
+              id="tabMieiBtn"
+              onclick="switchTab('miei', this)"
+            >
+              <i class="bi bi-person-lines-fill"></i> I Miei Contenuti
+            </button>
+          </div>
+
+          <div class="d-flex gap-2 align-items-center flex-wrap mb-4">
+            <input
+              type="text"
+              id="campoCerca"
+              class="aa-input"
+              placeholder="Cerca per titolo, artista, tag..."
+              oninput="debounceCerca()"
+              style="max-width: 300px"
+            />
+
+            <select
+              id="selectLimit"
+              class="aa-select"
+              onchange="cambiaLimite(this.value)"
+              style="width: auto"
+            >
+              <option value="12">12 / pag</option>
+              <option value="24">24 / pag</option>
+              <option value="48">48 / pag</option>
+            </select>
+            <div id="authorActions" class="aa-author-actions d-none">
+              <button
+                id="btnLogVendite"
+                class="btn-aa-outline"
+                onclick="apriLogModal()"
+              >
+                <i class="bi bi-graph-up-arrow"></i> Log Vendite
+              </button>
+              <a
+                href="/editor-item"
+                id="btnNuovoItem"
+                class="btn-aa-primary d-none"
+              >
+                <i class="bi bi-plus-circle"></i> Nuovo Item
+              </a>
+              <a
+                href="/editor-visita"
+                id="btnNuovaVisita"
+                class="btn-aa-primary d-none"
+              >
+                <i class="bi bi-plus-circle"></i> Nuova Visita
+              </a>
+            </div>
+          </div>
+
+          <div id="tabItems">
+            <div id="itemsGrid" class="row g-3">
+              <div class="col-12 text-center py-5">
+                <div class="aa-spinner"></div>
+                Caricamento...
+              </div>
+            </div>
+            <div id="paginazioneItems" class="aa-pagination"></div>
+          </div>
+
+          <div id="tabVisite" class="d-none">
+            <div id="visiteGrid" class="row g-3">
+              <div class="col-12 text-center py-5">
+                <div class="aa-spinner"></div>
+              </div>
+            </div>
+            <div id="paginazioneVisite" class="aa-pagination"></div>
+          </div>
+
+          <div id="tabMiei" class="d-none">
+            <div id="mieiContenuti">
+              <div class="aa-empty">
+                <div class="aa-empty-icon">🔐</div>
+                <h5>Accesso richiesto</h5>
+                <p>Effettua il login per vedere i tuoi contenuti.</p>
+                <a href="/" class="btn-aa-primary">Vai al login</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="itemModal" class="aa-modal-overlay d-none">
+      <div class="aa-modal" style="max-width: 640px">
+        <div class="aa-modal-header">
+          <h4 id="modalItemTitolo">–</h4>
+          <button class="aa-modal-close" onclick="chiudiItemModal()">✕</button>
+        </div>
+        <div class="aa-modal-body" id="modalItemBody"></div>
+        <div class="aa-modal-footer" id="modalItemFooter"></div>
+      </div>
+    </div>
+
+    <div id="visitaModal" class="aa-modal-overlay d-none">
+      <div class="aa-modal" style="max-width: 700px">
+        <div class="aa-modal-header">
+          <h4 id="modalVisitaTitolo">–</h4>
+          <button class="aa-modal-close" onclick="chiudiVisitaModal()">
+            ✕
+          </button>
+        </div>
+        <div class="aa-modal-body" id="modalVisitaBody"></div>
+        <div class="aa-modal-footer" id="modalVisitaFooter"></div>
+      </div>
+    </div>
+
+    <div class="aa-toast-container" id="toastContainer"></div>
+    <div id="loginModal" class="aa-modal-overlay d-none">
+      <div class="aa-modal" style="max-width: 420px">
+        <div id="authLoginSection">
+          <div class="aa-modal-header">
+            <h4>Accedi ad ArtAround</h4>
+            <button class="aa-modal-close" onclick="chiudiLogin()">✕</button>
+          </div>
+          <div class="aa-modal-body">
+            <div class="aa-form-group">
+              <label class="aa-label">Username o Email</label>
+              <input
+                type="text"
+                id="loginUsername"
+                class="aa-input"
+                placeholder="es. autore1"
+              />
+            </div>
+            <div class="aa-form-group">
+              <label class="aa-label">Password</label>
+              <input
+                type="password"
+                id="loginPassword"
+                class="aa-input"
+                placeholder="••••••••"
+              />
+            </div>
+            <div class="text-center mt-3" style="font-size: 0.85rem">
+              Non hai un account?
+              <a
+                href="#"
+                onclick="
+                  toggleAuthModal('register');
+                  return false;
+                "
+                class="text-gold fw-semibold"
+                >Registrati ora</a
+              >
+            </div>
+          </div>
+          <div class="aa-modal-footer">
+            <button class="btn-aa-outline" onclick="chiudiLogin()">
+              Annulla
+            </button>
+            <button class="btn-aa-primary" onclick="eseguiLogin()">
+              Accedi
+            </button>
+          </div>
+        </div>
+
+        <div id="authRegisterSection" class="d-none">
+          <div class="aa-modal-header">
+            <h4>Crea il tuo Account</h4>
+            <button class="aa-modal-close" onclick="chiudiLogin()">✕</button>
+          </div>
+          <div class="aa-modal-body">
+            <div class="aa-form-group">
+              <label class="aa-label"
+                >Username <span class="text-danger">*</span></label
+              >
+              <input
+                type="text"
+                id="regUsername"
+                class="aa-input"
+                placeholder="Scegli un username (min 3 car.)"
+              />
+            </div>
+            <div class="aa-form-group">
+              <label class="aa-label"
+                >Email <span class="text-danger">*</span></label
+              >
+              <input
+                type="email"
+                id="regEmail"
+                class="aa-input"
+                placeholder="Inserisci la tua email"
+              />
+            </div>
+            <div class="aa-form-group">
+              <label class="aa-label"
+                >Password <span class="text-danger">*</span></label
+              >
+              <input
+                type="password"
+                id="regPassword"
+                class="aa-input"
+                placeholder="Minimo 8 caratteri"
+              />
+            </div>
+
+            <div class="aa-form-group mb-3">
+              <label class="aa-label">Tipo di Account</label>
+              <div
+                class="d-flex gap-4 mt-1 p-2 rounded bg-cream border border-soft"
+                style="background-color: var(--aa-cream)"
+              >
+                <div class="form-check m-0 d-flex align-items-center gap-2">
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    name="regRuolo"
+                    id="ruoloVisitatore"
+                    value="visitatore"
+                    checked
+                    style="cursor: pointer"
+                  />
+                  <label
+                    class="form-check-label small fw-medium text-charcoal"
+                    for="ruoloVisitatore"
+                    style="cursor: pointer; margin: 0"
+                  >
+                    <i class="bi bi-person"></i> Visitatore
+                  </label>
+                </div>
+                <div class="form-check m-0 d-flex align-items-center gap-2">
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    name="regRuolo"
+                    id="ruoloAutore"
+                    value="autore"
+                    style="cursor: pointer"
+                  />
+                  <label
+                    class="form-check-label small fw-medium text-charcoal"
+                    for="ruoloAutore"
+                    style="cursor: pointer; margin: 0"
+                  >
+                    <i class="bi bi-pen"></i> Autore (Creatore)
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="text-center mt-3" style="font-size: 0.85rem">
+              Hai già un account?
+              <a
+                href="#"
+                onclick="
+                  toggleAuthModal('login');
+                  return false;
+                "
+                class="text-gold fw-semibold"
+                >Accedi qui</a
+              >
+            </div>
+          </div>
+          <div class="aa-modal-footer">
+            <button class="btn-aa-outline" onclick="chiudiLogin()">
+              Annulla
+            </button>
+            <button class="btn-aa-primary" onclick="eseguiRegistrazione()">
+              Registrati
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/dashboard.js"></script>
+
+    <div id="logModal" class="aa-modal-overlay d-none">
+      <div class="aa-modal" style="max-width: 750px">
+        <div class="aa-modal-header">
+          <h4>
+            <i class="bi bi-journal-text"></i> Registro Storico delle Vendite
+          </h4>
+          <button
+            class="aa-modal-close"
+            onclick="
+              document.getElementById('logModal').classList.add('d-none')
+            "
+          >
+            ✕
+          </button>
+        </div>
+        <div class="aa-modal-body" id="logBody"></div>
+      </div>
+    </div>
+  </body>
+</html>

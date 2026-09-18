@@ -1,0 +1,23 @@
+{
+  "museo": "Museo Egizio di Torino",
+  "logoUrl": "/navigator/img/logo-egizio.png",
+  "heroImage": "/navigator/img/museum_hero.jpg",
+  "motto": "Un viaggio millenario tra arte e storia",
+  "mappe": {
+    "-1": "/navigator/maps/mappa-museo-piano_-1.png",
+    "0": "/navigator/maps/mappa-museo-piano_0.png",
+    "1": "/navigator/maps/mappa-museo-piano_1.png",
+    "2": "/navigator/maps/mappa-museo-piano_2.png"
+  },
+  "colori": {
+    "primario": "#b38b4d",
+    "secondario": "#2c2c2c"
+  },
+  "logistica_globale": {
+    "uscita": "L'uscita si trova al piano terra, superando lo shop.",
+    "toilette": "I servizi igienici sono disponibili ad ogni piano, vicino agli ascensori.",
+    "bar": "Il bar caffetteria è situato al piano -1.",
+    "shop": "Il bookshop è all'ingresso principale.",
+    "emergenza": "Seguire le luci verdi verso le scale di sicurezza."
+  }
+}

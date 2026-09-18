@@ -1,0 +1,25 @@
+# Blocca le librerie esterne (obbligatorio, sono giganti!)
+navigator/
+node_modules/
+package-lock.json
+
+# Blocca le cartelle di tracciamento di Git
+.git/
+.github/
+
+# Blocca file multimediali pesanti (immagini e audio consumano token inutilmente)
+*.mp3
+*.wav
+*.m4a
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.svg
+*.pdf
+
+# Blocca file di log e configurazioni locali dell'editor
+.vscode/
+*.log
+.DS_Store
+Thumbs.db
