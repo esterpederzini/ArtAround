@@ -1,15 +1,21 @@
-/* ═══════════════════════════════════════════════════
-   editor-item.js – Logica Editor Item ArtAround
-   ═══════════════════════════════════════════════════ */
 
-let museoConfigurato = "";
-let mappaOpereLocali = {}; // Mappa per l'autocompilazione immediata client-side
+let configuredMuseum = "";
+let localArtworksMap = {};
 
-// ─── INIT ────────────────────────────────────────────
+const LANG_UI_MAP = {
+  child: "infantile",
+  medium: "medio",
+  advanced: "avanzato",
+  infantile: "infantile",
+  medio: "medio",
+  avanzato: "avanzato",
+};
+
 document.addEventListener("DOMContentLoaded", async () => {
-  aggiornaUtenteUI();
+  if (typeof aggiornaUtenteUI === "function") aggiornaUtenteUI();
 
-  if (!richiedeAutore()) {
+  const isAuthor = typeof richiedeAutore === "function" ? richiedeAutore() : true;
+  if (!isAuthor) {
     document.body.style.backgroundColor = "#1e2640";
     const navbar = document.querySelector(".aa-navbar");
     if (navbar) navbar.classList.add("d-none");
@@ -49,20 +55,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   document.body.style.backgroundColor = "var(--aa-cream)";
-  const containerNormale = document.getElementById("mainContent");
-  if (containerNormale) {
-    containerNormale.classList.remove("d-none");
+  const normalContainer = document.getElementById("mainContent");
+  if (normalContainer) normalContainer.classList.remove("d-none");
+
+  await initializeMuseumConfig();
+
+  const currentUser = typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
+  const authorInput = document.getElementById("autoreId");
+  if (authorInput && currentUser) {
+    authorInput.value = currentUser._id;
   }
 
-  await inizializzaMuseoDaConfig();
-
-  const utente = getUtenteCorrente();
-  const inputAutore = document.getElementById("autoreId");
-  if (inputAutore && utente) {
-    inputAutore.value = utente._id;
-  }
-
-  await popolaSelectOpere();
+  await populateArtworkSelect();
 
   [
     "titolo",
@@ -75,181 +79,164 @@ document.addEventListener("DOMContentLoaded", async () => {
   ].forEach((id) => {
     const el = document.getElementById(id);
     if (el) {
-      el.addEventListener("input", aggiornaPreview);
+      el.addEventListener("input", updatePreview);
       if (el.tagName === "SELECT") {
-        el.addEventListener("change", aggiornaPreview);
+        el.addEventListener("change", updatePreview);
       }
     }
   });
 
-  // Listener per controllare i duplicati in tempo reale al cambio di linguaggio o lunghezza
   ["linguaggio", "lunghezza"].forEach((id) => {
-    document
-      .getElementById(id)
-      ?.addEventListener("change", controllaIncrocioDuplicati);
+    document.getElementById(id)?.addEventListener("change", checkDuplicateVariant);
   });
 
   document.getElementById("descrizione")?.addEventListener("input", (e) => {
     const len = e.target.value.length;
     document.getElementById("charCount").textContent = len;
-
-    const prof = stimaProfondita(len);
-    document.getElementById("profonditaPreview").textContent = prof;
-    document.getElementById("profonditaContenuto").value = prof;
+    const depth = estimateContentDepth(len);
+    document.getElementById("profonditaPreview").textContent = depth;
+    document.getElementById("profonditaContenuto").value = depth;
   });
 
   document.getElementById("operaSelect")?.addEventListener("change", (e) => {
-    gestisciCambioSelezioneOpera(e.target.value);
+    handleArtworkSelectionChange(e.target.value);
   });
 
-  document.getElementById("immagineUrl")?.addEventListener(
-    "input",
-    debounce(() => {
-      aggiornaPreview();
-    }, 400),
-  );
+  const debouncedPreview = typeof debounce === "function"
+    ? debounce(() => updatePreview(), 400)
+    : () => updatePreview();
+
+  document.getElementById("immagineUrl")?.addEventListener("input", debouncedPreview);
 
   const params = new URLSearchParams(window.location.search);
-  if (params.get("id")) caricaItemPerModifica(params.get("id"));
+  if (params.get("id")) loadItemForEdit(params.get("id"));
 });
 
-// ─── CARICA CONFIGURAZIONE MUSEO DAL SERVER ──────────
-async function inizializzaMuseoDaConfig() {
+async function initializeMuseumConfig() {
   try {
     const response = await fetch("/api/config");
     if (!response.ok) return;
     const config = await response.json();
-    if (config && config.museo) {
-      museoConfigurato = config.museo;
-      const inputMuseo = document.getElementById("museo");
-      if (inputMuseo) inputMuseo.value = museoConfigurato;
+    const museum = config?.museumName || config?.museo;
+    if (museum) {
+      configuredMuseum = museum;
+      const inputMuseum = document.getElementById("museo");
+      if (inputMuseum) inputMuseum.value = configuredMuseum;
     }
   } catch (error) {
-    console.error("Errore nel caricamento del modulo config:", error);
+    console.error("Error loading museum configuration:", error);
   }
 }
 
-// ─── POPOLA IL MENU A TENDINA DELLE OPERE ────────────
-async function popolaSelectOpere() {
+async function populateArtworkSelect() {
   const select = document.getElementById("operaSelect");
   if (!select) return;
 
-  // Interroga l'API del backend filtrando per il museo configurato (carica anche i non pubblicati per sicurezza)
   const data = await apiFetch(
-    `/api/items?museo=${encodeURIComponent(museoConfigurato)}&limite=300&pubblicato=tutti`,
+    `/api/items?museum=${encodeURIComponent(configuredMuseum)}&limit=300&published=all`,
   );
   select.innerHTML = "";
 
-  const optDefault = document.createElement("option");
-  optDefault.value = "";
-  optDefault.textContent = "-- Scegli un'opera presente nel database --";
-  select.appendChild(optDefault);
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "-- Scegli un'opera presente nel database --";
+  select.appendChild(defaultOption);
 
-  if (!data || !data.items || data.items.length === 0) {
-    mappaOpereLocali = {};
+  const itemsList = data?.items || data?.data?.items || [];
+  if (!itemsList.length) {
+    localArtworksMap = {};
     return;
   }
 
-  mappaOpereLocali = {};
-  data.items.forEach((item) => {
-    if (item.operaId && !mappaOpereLocali[item.operaId]) {
-      mappaOpereLocali[item.operaId] = item;
+  localArtworksMap = {};
+  itemsList.forEach((item) => {
+    const key = item.artworkId || item.operaId;
+    if (key && !localArtworksMap[key]) {
+      localArtworksMap[key] = item;
     }
   });
 
-  Object.keys(mappaOpereLocali).forEach((operaId) => {
-    const opera = mappaOpereLocali[operaId];
+  Object.keys(localArtworksMap).forEach((artworkKey) => {
+    const item = localArtworksMap[artworkKey];
     const opt = document.createElement("option");
-    opt.value = operaId;
-    opt.textContent = `${opera.titoloOpera || opera.titolo || "Opera senza titolo"}`;
+    opt.value = artworkKey;
+    opt.textContent = `${item.title || item.titoloOpera || item.titolo || "Opera senza titolo"}`;
     select.appendChild(opt);
   });
 }
 
-// ─── GESTISCE IL CAMBIO DI SELEZIONE NEL MENU ────────
-async function gestisciCambioSelezioneOpera(valoreScelto) {
+async function handleArtworkSelectionChange(selectedValue) {
   const badge = document.getElementById("operaStatoBadge");
-  const inputOperaIdNascosto = document.getElementById("operaId");
-  const campiSchedaTecnica = ["artista", "stile", "periodo", "categoria"];
+  const hiddenArtworkId = document.getElementById("operaId");
+  const technicalFields = ["artista", "stile", "periodo", "categoria"];
 
-  if (valoreScelto) {
-    if (inputOperaIdNascosto) inputOperaIdNascosto.value = valoreScelto;
+  if (selectedValue) {
+    if (hiddenArtworkId) hiddenArtworkId.value = selectedValue;
     badge.textContent = "Opera Catalogata";
     badge.className = "badge ms-2 bg-success text-white";
     badge.classList.remove("d-none");
 
-    // Questo è l'item principale recuperato da MongoDB
-    const operaSelezionata = mappaOpereLocali[valoreScelto];
+    const selectedArtwork = localArtworksMap[selectedValue] || {};
 
-    // Compila i campi di testo storici
     document.getElementById("operaTitoloUfficiale").value =
-      operaSelezionata.titoloOpera || operaSelezionata.titolo || "";
+      selectedArtwork.title || selectedArtwork.titoloOpera || selectedArtwork.titolo || "";
     document.getElementById("artista").value =
-      operaSelezionata.artista || operaSelezionata.artist || "";
+      selectedArtwork.artist || selectedArtwork.artista || "";
     document.getElementById("stile").value =
-      operaSelezionata.stile || operaSelezionata.style || "";
+      selectedArtwork.style || selectedArtwork.stile || "";
     document.getElementById("periodo").value =
-      operaSelezionata.periodo || operaSelezionata.period || "";
+      selectedArtwork.period || selectedArtwork.periodo || "";
     document.getElementById("categoria").value =
-      operaSelezionata.categoria || "pittura";
+      selectedArtwork.category || selectedArtwork.categoria || "pittura";
 
-    if (operaSelezionata.immagine) {
-      document.getElementById("immagineUrl").value = operaSelezionata.immagine;
+    const imageLink = selectedArtwork.url || selectedArtwork.immagine || selectedArtwork.image;
+    if (imageLink) {
+      document.getElementById("immagineUrl").value = imageLink;
     }
 
-    // 🛠️ CRITICO: Memorizza i dati fisici della mappa ereditati dal seed dell'item principale
-    // In questo modo, quando salverai l'item secondario, manterrà le stesse esatte coordinate!
-    window.operaSelezionataMappa = {
-      piano: operaSelezionata.piano || "0",
-      mappa_x: Number(operaSelezionata.mappa_x) || 0,
-      mappa_y: Number(operaSelezionata.mappa_y) || 0,
+    window.selectedArtworkMap = {
+      floor: selectedArtwork.floor ?? selectedArtwork.piano ?? "0",
+      mapX: Number(selectedArtwork.mapX ?? selectedArtwork.mappa_x ?? 0),
+      mapY: Number(selectedArtwork.mapY ?? selectedArtwork.mappa_y ?? 0),
     };
 
-    disabilitaCampiOpere([...campiSchedaTecnica, "operaTitoloUfficiale"], true);
+    setFieldsDisabled([...technicalFields, "operaTitoloUfficiale"], true);
     document.getElementById("titolo").value = "";
 
-    // Richiedi tutte le varianti registrate per questa opera per popolare la cronologia laterale
-    const dataVarianti = await apiFetch(
-      `/api/items?operaId=${encodeURIComponent(valoreScelto)}&limite=100`,
+    const variantsData = await apiFetch(
+      `/api/items?artworkId=${encodeURIComponent(selectedValue)}&limit=100`,
     );
-    if (dataVarianti && dataVarianti.items) {
-      renderElencoVarianti(dataVarianti.items);
-    }
+    const variants = variantsData?.items || variantsData?.data?.items || [];
+    renderVariantsList(variants);
   } else {
-    if (inputOperaIdNascosto) inputOperaIdNascosto.value = "";
+    if (hiddenArtworkId) hiddenArtworkId.value = "";
     document.getElementById("operaTitoloUfficiale").value = "";
     badge.classList.add("d-none");
-    window.operaSelezionataMappa = null; // Resetta la mappa volatile
-    disabilitaCampiOpere(
-      [...campiSchedaTecnica, "operaTitoloUfficiale"],
-      false,
-    );
+    window.selectedArtworkMap = null;
+    setFieldsDisabled([...technicalFields, "operaTitoloUfficiale"], false);
     document.getElementById("variantiList").innerHTML =
       '<em class="text-slate small">Seleziona un\'opera per esaminare le varianti...</em>';
   }
 
-  aggiornaPreview();
+  updatePreview();
 }
 
-// Controllo preventivo: se l'autore sta configurando una variante con livello e durata identici a una già esistente
-async function controllaIncrocioDuplicati() {
-  const operaId = document.getElementById("operaId").value;
-  const linguaggio = document.getElementById("linguaggio").value;
-  const lunghezza = document.getElementById("lunghezza").value;
+async function checkDuplicateVariant() {
+  const artworkId = document.getElementById("operaId").value;
+  const language = document.getElementById("linguaggio").value;
+  const length = document.getElementById("lunghezza").value;
   const currentItemId = document.getElementById("itemId").value;
 
-  if (!operaId) return;
+  if (!artworkId) return;
 
   const data = await apiFetch(
-    `/api/items?operaId=${encodeURIComponent(operaId)}&linguaggio=${linguaggio}&lunghezza=${lunghezza}`,
+    `/api/items?artworkId=${encodeURIComponent(artworkId)}&language=${language}&length=${length}`,
   );
-  const incontri = data?.items || [];
-
-  // Se esiste un record con gli stessi metadati ed ha un ID diverso da quello che stiamo modificando
-  const duplicatoReale = incontri.find((i) => i._id !== currentItemId);
+  const matched = data?.items || data?.data?.items || [];
+  const realDuplicate = matched.find((i) => i._id !== currentItemId);
   const badge = document.getElementById("operaStatoBadge");
 
-  if (duplicatoReale) {
+  if (realDuplicate) {
     badge.textContent = "Attenzione: Variante Duplicata";
     badge.className = "badge ms-2 bg-warning text-dark";
     showToast(
@@ -257,215 +244,221 @@ async function controllaIncrocioDuplicati() {
       "info",
     );
   } else {
-    badge.textContent = currentItemId
-      ? "Modalità Modifica"
-      : "Opera Catalogata";
+    badge.textContent = currentItemId ? "Modalità Modifica" : "Opera Catalogata";
     badge.className = "badge ms-2 bg-success text-white";
   }
 }
 
-function disabilitaCampiOpere(listaCampi, bloccati) {
-  listaCampi.forEach((id) => {
+function setFieldsDisabled(fieldsList, disabled) {
+  fieldsList.forEach((id) => {
     const el = document.getElementById(id);
     if (el) {
-      el.readOnly = bloccati;
-      if (el.tagName === "SELECT") el.disabled = bloccati;
-      el.style.backgroundColor = bloccati ? "var(--aa-cream)" : "";
-      el.style.cursor = bloccati ? "not-allowed" : "";
+      el.readOnly = disabled;
+      if (el.tagName === "SELECT") el.disabled = disabled;
+      el.style.backgroundColor = disabled ? "var(--aa-cream)" : "";
+      el.style.cursor = disabled ? "not-allowed" : "";
     }
   });
 }
 
-function renderElencoVarianti(items) {
+function renderVariantsList(items) {
   const container = document.getElementById("variantiList");
   if (!container) return;
 
   const currentItemId = document.getElementById("itemId").value;
-  const filtrate = items.filter((i) => i._id !== currentItemId);
+  const filtered = items.filter((i) => i._id !== currentItemId);
 
-  if (!filtrate.length) {
+  if (!filtered.length) {
     container.innerHTML =
       '<em class="text-slate small">Nessuna spiegazione alternativa registrata oltre a questa.</em>';
     return;
   }
 
-  container.innerHTML = filtrate
-    .map(
-      (v) => `
-    <div class="d-flex align-items-center gap-2 mb-1 p-1 rounded" style="background:var(--aa-cream); font-size: 0.8rem">
-      <div class="flex-grow-1 min-w-0">
-        <div class="text-truncate"><strong>Target:</strong> ${v.linguaggio} (${v.lunghezza})</div>
-        <div class="text-slate" style="font-size:0.7rem">Titolo: ${v.titolo} · Prezzo: €${v.prezzo || 0}</div>
-      </div>
-      <a href="/editor-item?id=${v._id}" class="btn-aa-outline" style="font-size:0.68rem;padding:2px 6px">✎ Modifica</a>
-    </div>
-  `,
-    )
+  container.innerHTML = filtered
+    .map((v) => {
+      const lang = LANG_UI_MAP[v.language || v.linguaggio] || v.language || v.linguaggio;
+      const len = v.length || v.lunghezza || "15s";
+      const title = v.title || v.titolo || "Item";
+      const price = Number(v.price ?? v.prezzo ?? 0);
+
+      return `
+        <div class="d-flex align-items-center gap-2 mb-1 p-1 rounded" style="background:var(--aa-cream); font-size: 0.8rem">
+          <div class="flex-grow-1 min-w-0">
+            <div class="text-truncate"><strong>Target:</strong> ${lang} (${len})</div>
+            <div class="text-slate" style="font-size:0.7rem">Titolo: ${title} · Prezzo: €${price}</div>
+          </div>
+          <a href="/editor-item?id=${v._id}" class="btn-aa-outline" style="font-size:0.68rem;padding:2px 6px">✎ Modifica</a>
+        </div>
+      `;
+    })
     .join("");
 }
-
-// ─── LIVE PREVIEW DELLE CARD ─────────────────────────
-function aggiornaPreview() {
-  const titolo = document.getElementById("titolo").value || "Titolo item";
+function updatePreview() {
+  const title = document.getElementById("titolo").value || "Titolo item";
   const desc =
     document.getElementById("descrizione").value ||
     "La descrizione apparirà qui...";
-  const linguaggio = document.getElementById("linguaggio").value;
-  const lunghezza = document.getElementById("lunghezza").value;
-  const prezzo = Number(document.getElementById("prezzo").value) || 0;
-  const licenza = document.getElementById("licenzaTipo").value;
-  const imgUrl = document.getElementById("immagineUrl").value.trim();
+  const language = document.getElementById("linguaggio").value;
+  const length = document.getElementById("lunghezza").value;
+  const price = Number(document.getElementById("prezzo").value) || 0;
+  const license = document.getElementById("licenzaTipo").value;
+  const imageUrl = document.getElementById("immagineUrl").value.trim();
 
-  document.getElementById("prevTitolo").textContent = titolo;
+  document.getElementById("prevTitolo").textContent = title;
   document.getElementById("prevDesc").textContent =
     desc.substring(0, 100) + (desc.length > 100 ? "…" : "");
-  document.getElementById("prevLen").textContent = lunghezza;
-  document.getElementById("prevLicenza").textContent = licenza;
+  document.getElementById("prevLen").textContent = length;
+  document.getElementById("prevLicenza").textContent = license;
 
   const prevLangContainer = document.getElementById("prevLang")?.parentElement;
   if (prevLangContainer) {
-    const vecchioBadge = document.getElementById("prevLang");
-    if (vecchioBadge) vecchioBadge.remove();
+    const oldBadge = document.getElementById("prevLang");
+    if (oldBadge) oldBadge.remove();
 
-    const htmlNuovoBadge = badgeLinguaggio(linguaggio);
-    prevLangContainer.insertAdjacentHTML("afterbegin", htmlNuovoBadge);
-
-    const badgeAppenaInserito = prevLangContainer.querySelector(".aa-badge");
-    if (badgeAppenaInserito) badgeAppenaInserito.id = "prevLang";
+    if (typeof badgeLinguaggio === "function") {
+      const newBadgeHtml = badgeLinguaggio(language);
+      prevLangContainer.insertAdjacentHTML("afterbegin", newBadgeHtml);
+      const inserted = prevLangContainer.querySelector(".aa-badge");
+      if (inserted) inserted.id = "prevLang";
+    }
   }
 
   const prevPrice = document.getElementById("prevPrice");
   if (prevPrice) {
-    if (prezzo === 0) {
+    if (price === 0) {
       prevPrice.className = "aa-badge aa-badge-free";
       prevPrice.textContent = "Gratuito";
     } else {
       prevPrice.className = "aa-price";
-      prevPrice.textContent = `€ ${prezzo.toFixed(2)}`;
+      prevPrice.textContent = `€ ${price.toFixed(2)}`;
     }
   }
 
   const prevImg = document.getElementById("prevImg");
   if (prevImg) {
-    if (imgUrl) {
-      prevImg.innerHTML = `<img src="${imgUrl}" style="width:100%;height:120px;object-fit:cover;border-radius:6px 6px 0 0">`;
+    if (imageUrl) {
+      prevImg.innerHTML = `<img src="${imageUrl}" style="width:100%;height:120px;object-fit:cover;border-radius:6px 6px 0 0">`;
     } else {
       prevImg.innerHTML = "🖼️";
     }
   }
 }
 
-function stimaProfondita(len) {
-  if (len < 120) return "superficiale";
-  if (len < 350) return "standard";
-  if (len < 750) return "approfondito";
+function estimateContentDepth(length) {
+  if (length < 120) return "superficiale";
+  if (length < 350) return "standard";
+  if (length < 750) return "approfondito";
   return "accademico";
 }
+async function saveItem() {
+  const currentUser = typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
 
-// ─── INVIO E SALVATAGGIO DEI DATI ─────────────────────
-async function salvaItem() {
-  const utenteCorrente = getUtenteCorrente();
-  const operaSelectEl = document.getElementById("operaSelect");
-  const operaIdScelto = operaSelectEl?.value || "";
-  const operaCatalogata = mappaOpereLocali[operaIdScelto] || {};
-
-  const operaId = document.getElementById("operaId")?.value?.trim() || "";
-  const museo = document.getElementById("museo")?.value?.trim() || "";
-  const titolo = document.getElementById("titolo")?.value?.trim() || "";
-  const autoreId = document.getElementById("autoreId")?.value || "";
-  const desc = document.getElementById("descrizione")?.value?.trim() || "";
-  const lunghezza = document.getElementById("lunghezza")?.value || "3s";
-  const linguaggio = document.getElementById("linguaggio")?.value || "medio";
-  const categoria = document.getElementById("categoria")?.value || "pittura";
-  const profondita =
-    document.getElementById("profonditaContenuto")?.value || "standard";
+  const artworkId = document.getElementById("operaId")?.value?.trim() || "";
+  const museum = document.getElementById("museo")?.value?.trim() || "";
+  const title = document.getElementById("titolo")?.value?.trim() || "";
+  const authorId = document.getElementById("autoreId")?.value || "";
+  const description = document.getElementById("descrizione")?.value?.trim() || "";
+  const length = document.getElementById("lunghezza")?.value || "15s";
+  const language = document.getElementById("linguaggio")?.value || "medium";
+  const category = document.getElementById("categoria")?.value || "pittura";
+  const contentDepth = document.getElementById("profonditaContenuto")?.value || "standard";
   const tags = (document.getElementById("tags")?.value || "")
     .split(",")
     .map((t) => t.trim())
     .filter(Boolean);
-  const immagineUrl =
-    document.getElementById("immagineUrl")?.value?.trim() || "";
-  const licenzaTipo =
-    document.getElementById("licenzaTipo")?.value || "gratuito";
-  const licenzaNote =
-    document.getElementById("licenzaNote")?.value?.trim() || "";
-  const prezzo = Number(document.getElementById("prezzo")?.value) || 0;
-  const pubblicato = document.getElementById("pubblicato")
+  const imageUrl = document.getElementById("immagineUrl")?.value?.trim() || "";
+  const licenseType = document.getElementById("licenzaTipo")?.value || "gratuito";
+  const licenseNotes = document.getElementById("licenzaNote")?.value?.trim() || "";
+  const price = Number(document.getElementById("prezzo")?.value) || 0;
+  const isPublished = document.getElementById("pubblicato")
     ? document.getElementById("pubblicato").checked
     : true;
   const id = document.getElementById("itemId")?.value || "";
 
-  const artista = document.getElementById("artista")?.value?.trim() || "";
-  const stile = document.getElementById("stile")?.value?.trim() || "";
-  const periodo = document.getElementById("periodo")?.value?.trim() || "";
-  const titoloOpera =
-    document.getElementById("operaTitoloUfficiale")?.value?.trim() || "";
+  const artist = document.getElementById("artista")?.value?.trim() || "";
+  const style = document.getElementById("stile")?.value?.trim() || "";
+  const period = document.getElementById("periodo")?.value?.trim() || "";
 
-  if (!operaId)
+  if (!artworkId)
     return showToast(
       "Seleziona un'opera ufficiale dall'elenco per continuare.",
       "error",
     );
-  if (!titolo)
+  if (!title)
     return showToast(
       "Il titolo della traccia audio (Item) è necessario.",
       "error",
     );
-  if (!desc)
+  if (!description)
     return showToast(
       "Scrivi il testo della spiegazione per la guida.",
       "error",
     );
-  if (!autoreId)
+  if (!authorId)
     return showToast("Sessione autore non valida. Riesegui il login.", "error");
 
-  const linkImmagine = immagineUrl || "/img/default_item_image.jpg";
-
-  const mappaEreditata = window.operaSelezionataMappa || {};
+  const imageLink = imageUrl || "/img/default_item_image.jpg";
+  const inheritedMap = window.selectedArtworkMap || {};
 
   const payload = {
-    operaId,
-    museo,
-    titolo,
-    descrizione: desc,
-    lunghezza,
-    linguaggio,
-    categoria,
-    profonditaContenuto: profondita,
+    artworkId,
+    operaId: artworkId,
+    museum,
+    museo: museum,
+    title,
+    titolo: title,
+    description,
+    descrizione: description,
+    length,
+    lunghezza: length,
+    language,
+    linguaggio: language,
+    category,
+    categoria: category,
+    contentDepth,
+    profonditaContenuto: contentDepth,
     tags,
-    prezzo,
-    pubblicato,
-    creatorId: autoreId,
-    url: linkImmagine,
-    immagine: linkImmagine,
+    price,
+    prezzo: price,
+    isPublished,
+    pubblicato: isPublished,
+    creatorId: authorId,
+    url: imageLink,
+    image: imageLink,
+    immagine: imageLink,
     audioUrl: "",
-    artista: artista || "Ignoto",
-    stile: stile || "Periodo storico non specificato",
-    periodo: periodo || "",
-    titoloOpera: titoloOpera || titolo,
-    autore_visita: utenteCorrente?.username || "Autore",
-    autore: utenteCorrente?.username || "Autore",
+    artist: artist || "Ignoto",
+    artista: artist || "Ignoto",
+    style: style || "Periodo storico non specificato",
+    stile: style || "Periodo storico non specificato",
+    period: period || "",
+    periodo: period || "",
+    tourAuthor: currentUser?.username || "Autore",
+    autore_visita: currentUser?.username || "Autore",
+    autore: currentUser?.username || "Autore",
 
-    // 🛠️ FIX: Prende i dati fisici immutabili dall'item principale del seed!
-    piano: mappaEreditata.piano || "0",
-    mappa_x: mappaEreditata.mappa_x !== undefined ? mappaEreditata.mappa_x : 0,
-    mappa_y: mappaEreditata.mappa_y !== undefined ? mappaEreditata.mappa_y : 0,
+    floor: inheritedMap.floor || "0",
+    piano: inheritedMap.floor || "0",
+    mapX: inheritedMap.mapX !== undefined ? inheritedMap.mapX : 0,
+    mappa_x: inheritedMap.mapX !== undefined ? inheritedMap.mapX : 0,
+    mapY: inheritedMap.mapY !== undefined ? inheritedMap.mapY : 0,
+    mappa_y: inheritedMap.mapY !== undefined ? inheritedMap.mapY : 0,
 
-    licenza: { tipo: licenzaTipo, note: licenzaNote },
+    license: { type: licenseType, notes: licenseNotes },
+    licenza: { tipo: licenseType, note: licenseNotes },
   };
 
-  const metodo = id ? "PUT" : "POST";
+  const method = id ? "PUT" : "POST";
   const url = id ? `/api/items/${id}` : "/api/items";
-
   if (id) payload._id = id;
 
-  const ok = await apiFetch(url, {
-    method: metodo,
+  const result = await apiFetch(url, {
+    method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
-  if (ok) {
+  if (result) {
     showToast(
       id
         ? "Spiegazione aggiornata nel database!"
@@ -477,52 +470,54 @@ async function salvaItem() {
     }, 500);
   }
 }
-
-// ─── CARICA VARIANTE IN MODIFICA VIA URL QUERY
-async function caricaItemPerModifica(id) {
-  const item = await apiFetch(`/api/items/${id}`);
+async function loadItemForEdit(id) {
+  const response = await apiFetch(`/api/items/${id}`);
+  const item = response?.data || response;
   if (!item) return;
 
-  document.getElementById("itemId").value = item._id;
-  document.getElementById("operaId").value = item.operaId;
+  const artworkKey = item.artworkId || item.operaId;
 
-  const operaNativa = mappaOpereLocali[item.operaId];
+  document.getElementById("itemId").value = item._id;
+  document.getElementById("operaId").value = artworkKey;
+
+  const nativeArtwork = localArtworksMap[artworkKey];
   document.getElementById("operaTitoloUfficiale").value =
-    item.titoloOpera || (operaNativa ? operaNativa.titolo : item.titolo) || "";
-  document.getElementById("titolo").value = item.titolo;
-  document.getElementById("museo").value = item.museo;
+    item.title || item.titoloOpera || nativeArtwork?.title || item.titolo || "";
+  document.getElementById("titolo").value = item.title || item.titolo || "";
+  document.getElementById("museo").value = item.museum || item.museo || "";
   document.getElementById("autoreId").value =
     item.creatorId?._id || item.creatorId || "";
-  document.getElementById("descrizione").value = item.descrizione;
-  document.getElementById("lunghezza").value = item.lunghezza;
-  document.getElementById("linguaggio").value = item.linguaggio;
-  document.getElementById("categoria").value = item.categoria;
+  document.getElementById("descrizione").value = item.description || item.descrizione || "";
+  document.getElementById("lunghezza").value = item.length || item.lunghezza || "15s";
+  document.getElementById("linguaggio").value = item.language || item.linguaggio || "medium";
+  document.getElementById("categoria").value = item.category || item.categoria || "pittura";
   document.getElementById("profonditaContenuto").value =
-    item.profonditaContenuto || "standard";
+    item.contentDepth || item.profonditaContenuto || "standard";
   document.getElementById("tags").value = (item.tags || []).join(", ");
-  document.getElementById("immagineUrl").value = item.immagine || "";
+  document.getElementById("immagineUrl").value =
+    item.url || item.image || item.immagine || "";
   document.getElementById("licenzaTipo").value =
-    item.licenza?.tipo || "gratuito";
-  document.getElementById("licenzaNote").value = item.licenza?.note || "";
-  document.getElementById("prezzo").value = item.prezzo || 0;
-  document.getElementById("pubblicato").checked = item.pubblicato !== false;
+    item.license?.type || item.licenza?.tipo || "gratuito";
+  document.getElementById("licenzaNote").value =
+    item.license?.notes || item.licenza?.note || "";
+  document.getElementById("prezzo").value = Number(item.price ?? item.prezzo ?? 0);
+  document.getElementById("pubblicato").checked =
+    (item.isPublished ?? item.pubblicato) !== false;
 
-  document.getElementById("artista").value = item.artista || item.artist || "";
-  document.getElementById("stile").value = item.stile || item.style || "";
-  document.getElementById("periodo").value = item.periodo || item.period || "";
+  document.getElementById("artista").value = item.artist || item.artista || "";
+  document.getElementById("stile").value = item.style || item.stile || "";
+  document.getElementById("periodo").value = item.period || item.periodo || "";
 
-  document.getElementById("charCount").textContent = item.descrizione.length;
-  document.getElementById("profonditaPreview").textContent = stimaProfondita(
-    item.descrizione.length,
-  );
-  document.getElementById("formTitolo").textContent =
-    ` Modifica: ${item.titolo}`;
+  const descLen = (item.description || item.descrizione || "").length;
+  document.getElementById("charCount").textContent = descLen;
+  document.getElementById("profonditaPreview").textContent = estimateContentDepth(descLen);
+  document.getElementById("formTitolo").textContent = ` Modifica: ${item.title || item.titolo}`;
 
   setTimeout(() => {
     const select = document.getElementById("operaSelect");
     if (select) {
-      select.value = item.operaId;
-      disabilitaCampiOpere(
+      select.value = artworkKey;
+      setFieldsDisabled(
         ["artista", "stile", "periodo", "operaTitoloUfficiale", "categoria"],
         true,
       );
@@ -534,20 +529,16 @@ async function caricaItemPerModifica(id) {
   badge.className = "badge ms-2 bg-success text-white";
   badge.classList.remove("d-none");
 
-  // Richiedi le varianti alternative escludendo quella corrente
-  const dataVarianti = await apiFetch(
-    `/api/items?operaId=${encodeURIComponent(item.operaId)}&limite=100`,
+  const variantsData = await apiFetch(
+    `/api/items?artworkId=${encodeURIComponent(artworkKey)}&limit=100`,
   );
-  if (dataVarianti && dataVarianti.items) {
-    renderElencoVarianti(dataVarianti.items);
-  }
+  const variants = variantsData?.items || variantsData?.data?.items || [];
+  renderVariantsList(variants);
 
-  aggiornaPreview();
+  updatePreview();
 }
-
-// ─── SVUOTA E RIPRISTINA IL MODULO ────────────────────
 function resetForm() {
-  const campiDaPulire = [
+  const fieldsToClear = [
     "operaId",
     "operaTitoloUfficiale",
     "titolo",
@@ -560,23 +551,23 @@ function resetForm() {
     "periodo",
     "operaSelect",
   ];
-  campiDaPulire.forEach((id) => {
+  fieldsToClear.forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
 
-  disabilitaCampiOpere(
+  setFieldsDisabled(
     ["artista", "stile", "periodo", "operaTitoloUfficiale", "categoria"],
     false,
   );
   document.getElementById("operaStatoBadge").classList.add("d-none");
 
-  inizializzaMuseoDaConfig();
-  const utente = getUtenteCorrente();
-  if (utente) document.getElementById("autoreId").value = utente._id;
+  initializeMuseumConfig();
+  const currentUser = typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
+  if (currentUser) document.getElementById("autoreId").value = currentUser._id;
 
-  document.getElementById("lunghezza").value = "3s";
-  document.getElementById("linguaggio").value = "medio";
+  document.getElementById("lunghezza").value = "15s";
+  document.getElementById("linguaggio").value = "medium";
   document.getElementById("categoria").value = "pittura";
   document.getElementById("profonditaContenuto").value = "standard";
   document.getElementById("licenzaTipo").value = "gratuito";
@@ -595,5 +586,11 @@ function resetForm() {
     prevLang.className = "aa-badge";
   }
 
-  aggiornaPreview();
+  updatePreview();
 }
+
+const salvaItem = saveItem;
+const controllaIncrocioDuplicati = checkDuplicateVariant;
+const gestisciCambioSelezioneOpera = handleArtworkSelectionChange;
+const caricaItemPerModifica = loadItemForEdit;
+const aggiornaPreview = updatePreview;

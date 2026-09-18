@@ -48,11 +48,9 @@ const NavigatorHome = () => {
   }, []);
 
   const filteredVisits = visits.filter((visita) => {
-    // Esclude le visite private
     const isPublic = visita.isPublic ?? visita.pubblica ?? true;
     if (!isPublic) return false;
-
-    // Esclude le visite a pagamento
+    
     const price = Number(visita.price ?? visita.prezzo ?? 0);
     if (price > 0) return false;
 

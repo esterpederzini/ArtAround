@@ -83,7 +83,6 @@ app.get("/api/tts", async (req, res) => {
   }
 });
 
-// Static files for frontend applications
 const navigatorDistPath = path.join(__dirname, "navigator", "dist");
 const navigatorSourcePath = path.join(__dirname, "navigator");
 
@@ -111,7 +110,6 @@ app.get(/^\/navigator(?:\/.*)?$/, (req, res) => {
   return res.status(404).send("Mobile app build not found.");
 });
 
-// Marketplace static frontend
 app.use(
   "/",
   express.static(path.join(__dirname, "marketplace"), {
@@ -123,7 +121,6 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "marketplace", "index.html"));
 });
 
-// 404 Handler
 app.use((req, res) => {
   res
     .status(404)

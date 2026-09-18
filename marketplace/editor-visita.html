@@ -43,7 +43,7 @@
               <a
                 class="nav-link"
                 href="/navigator/"
-                style="color: var(--aa-gold); fw-bold"
+                style="color: var(--aa-gold); font-weight: bold"
                 >Navigator</a
               >
             </li>
@@ -111,9 +111,9 @@
                   <span class="required">*</span></label
                 >
                 <select id="visitaLivelloBase" class="aa-select">
-                  <option value="infantile">Guida Infantile</option>
-                  <option value="medio">Guida Media</option>
-                  <option value="avanzato" selected>Guida Avanzata</option>
+                  <option value="child">Guida Infantile</option>
+                  <option value="medium">Guida Media</option>
+                  <option value="advanced" selected>Guida Avanzata</option>
                 </select>
               </div>
 
@@ -225,10 +225,7 @@
               <input type="hidden" id="visitaId" />
 
               <div class="d-flex gap-2 mt-3">
-                <button
-                  class="btn-aa-primary flex-grow-1"
-                  onclick="salvaVisita()"
-                >
+                <button class="btn-aa-primary flex-grow-1" onclick="saveTour()">
                   <i class="bi bi-floppy"></i> Salva Visita
                 </button>
                 <button class="btn-aa-outline" onclick="resetEditor()">

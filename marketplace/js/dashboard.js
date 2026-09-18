@@ -1,101 +1,105 @@
-const stato = {
-  tabCorrente: "items",
-  filtri: {
-    museo: "",
-    linguaggio: "",
-    categoria: "",
-    prezzo: "",
-    cerca: "",
+const state = {
+  currentTab: "items",
+  filters: {
+    museum: "",
+    language: "",
+    category: "",
+    price: "",
+    search: "",
   },
-  paginaItems: 1,
-  paginaVisite: 1,
-  limite: 12,
+  itemsPage: 1,
+  visitsPage: 1,
+  limit: 12,
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const config = await caricaConfigMuseo();
+  const config = await loadMuseumConfig();
   if (!config) {
     showToast("Configurazione museo non trovata", "error");
     return;
   }
 
   const params = new URLSearchParams(window.location.search);
-  if (params.get("museo")) stato.filtri.museo = params.get("museo");
+  if (params.get("museo")) state.filters.museum = params.get("museo");
+  if (params.get("museum")) state.filters.museum = params.get("museum");
 
-  await caricaMuseiFiltro();
-  await caricaItems();
-  caricaVisiteTab();
+  await loadMuseumFilters();
+  await loadItems();
+  loadVisitsTab();
 
-  aggiornaUtenteUI();
-  const u = getUtenteCorrente();
+  if (typeof aggiornaUtenteUI === "function") aggiornaUtenteUI();
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
 
-  if (u) {
+  if (currentUser) {
     document.getElementById("tabMieiBtn")?.classList.remove("d-none");
+    const role = currentUser.role || currentUser.ruolo;
 
-    if (["autore", "admin", "visitatore"].includes(u.ruolo)) {
+    if (["author", "autore", "admin", "visitor", "visitatore"].includes(role)) {
       document.getElementById("authorActions")?.classList.remove("d-none");
 
-      if (["autore", "admin"].includes(u.ruolo)) {
+      if (["author", "autore", "admin"].includes(role)) {
         document.getElementById("sidebarLog")?.classList.remove("d-none");
         document.getElementById("btnLogVendite")?.classList.remove("d-none");
-      } else {
-        document.getElementById("btnLogVendite")?.classList.add("d-none");
-      }
-
-      if (["autore", "admin"].includes(u.ruolo)) {
         document.getElementById("btnNuovoItem")?.classList.remove("d-none");
       } else {
+        document.getElementById("btnLogVendite")?.classList.add("d-none");
         document.getElementById("btnNuovoItem")?.classList.add("d-none");
       }
 
       document.getElementById("btnNuovaVisita")?.classList.add("d-none");
-    }
-
-    if (["autore", "admin", "visitatore"].includes(u.ruolo)) {
       document.getElementById("navEditorVisita")?.classList.remove("d-none");
     }
   }
 
-  configuraBtnFiltri("[data-museo]", (v) => {
-    stato.filtri.museo = v;
-    stato.paginaItems = 1;
-    caricaItems();
+  configureFilterButtons("[data-museo]", (val) => {
+    state.filters.museum = val;
+    state.itemsPage = 1;
+    loadItems();
   });
-  configuraBtnFiltri("[data-lang]", (v) => {
-    stato.filtri.linguaggio = v;
-    stato.paginaItems = 1;
-    caricaItems();
+  configureFilterButtons("[data-lang]", (val) => {
+    state.filters.language = val;
+    state.itemsPage = 1;
+    loadItems();
   });
-  configuraBtnFiltri("[data-cat]", (v) => {
-    stato.filtri.categoria = v;
-    stato.paginaItems = 1;
-    caricaItems();
+  configureFilterButtons("[data-cat]", (val) => {
+    state.filters.category = val;
+    state.itemsPage = 1;
+    loadItems();
   });
-  configuraBtnFiltri("[data-prezzo]", (v) => {
-    stato.filtri.prezzo = v;
-    stato.paginaItems = 1;
-    caricaItems();
+  configureFilterButtons("[data-prezzo]", (val) => {
+    state.filters.price = val;
+    state.itemsPage = 1;
+    loadItems();
   });
 
-  document.getElementById("campoCerca")?.addEventListener(
-    "input",
-    debounce((e) => {
-      stato.filtri.cerca = e.target.value.trim();
-      stato.paginaItems = 1;
-      caricaItems();
-    }, 350),
-  );
+  const searchInput = document.getElementById("campoCerca");
+  if (searchInput) {
+    const debouncedSearch =
+      typeof debounce === "function"
+        ? debounce((e) => {
+            state.filters.search = e.target.value.trim();
+            state.itemsPage = 1;
+            loadItems();
+          }, 350)
+        : (e) => {
+            state.filters.search = e.target.value.trim();
+            state.itemsPage = 1;
+            loadItems();
+          };
+    searchInput.addEventListener("input", debouncedSearch);
+  }
 
   document.getElementById("selectLimit")?.addEventListener("change", (e) => {
-    stato.limite = Number(e.target.value);
-    stato.paginaItems = 1;
-    caricaItems();
+    state.limit = Number(e.target.value);
+    state.itemsPage = 1;
+    loadItems();
   });
 
-  if (stato.filtri.museo) {
+  if (state.filters.museum) {
     setTimeout(() => {
       const btn = document.querySelector(
-        `[data-museo="${stato.filtri.museo}"]`,
+        `[data-museo="${state.filters.museum}"]`,
       );
       if (btn) {
         document
@@ -107,28 +111,25 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   const tabParam = params.get("tab");
-  const visitaIdParam = params.get("visitaId");
-
-  //  INCOLLA QUESTO NUOVO BLOCCO REVISIONATO:
-  if (tabParam === "visite") {
+  if (tabParam === "visite" || tabParam === "visits") {
     const btnVisiteTab = document.querySelector('.aa-tab[onclick*="visite"]');
     if (btnVisiteTab) {
       switchTab("visite", btnVisiteTab);
     } else {
-      caricaVisiteTab();
+      loadVisitsTab();
     }
 
-    const visitaIdDaAprire = sessionStorage.getItem("apriVisitaId");
-    if (visitaIdDaAprire) {
+    const visitIdToOpen = sessionStorage.getItem("apriVisitaId");
+    if (visitIdToOpen) {
       sessionStorage.removeItem("apriVisitaId");
       setTimeout(() => {
-        apriVisitaModal(visitaIdDaAprire);
+        openVisitModal(visitIdToOpen);
       }, 300);
     }
   }
 });
 
-function configuraBtnFiltri(selector, callback) {
+function configureFilterButtons(selector, callback) {
   document.querySelectorAll(selector).forEach((btn) => {
     btn.addEventListener("click", () => {
       btn
@@ -146,12 +147,14 @@ function configuraBtnFiltri(selector, callback) {
     });
   });
 }
+
 function switchTab(tab, btnEl) {
-  stato.tabCorrente = tab;
+  state.currentTab = tab;
   document
     .querySelectorAll(".aa-tab")
     .forEach((b) => b.classList.remove("active"));
   btnEl.classList.add("active");
+
   document
     .getElementById("tabItems")
     .classList.toggle("d-none", tab !== "items");
@@ -162,12 +165,17 @@ function switchTab(tab, btnEl) {
 
   const btnNuovoItem = document.getElementById("btnNuovoItem");
   const btnNuovaVisita = document.getElementById("btnNuovaVisita");
-  const u = getUtenteCorrente();
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
+  const role = currentUser?.role || currentUser?.ruolo;
 
   if (btnNuovoItem && btnNuovaVisita) {
-    if (u && ["autore", "admin", "visitatore"].includes(u.ruolo)) {
+    if (
+      currentUser &&
+      ["author", "autore", "admin", "visitor", "visitatore"].includes(role)
+    ) {
       if (tab === "items") {
-        if (["autore", "admin"].includes(u.ruolo)) {
+        if (["author", "autore", "admin"].includes(role)) {
           btnNuovoItem.classList.remove("d-none");
         } else {
           btnNuovoItem.classList.add("d-none");
@@ -186,12 +194,12 @@ function switchTab(tab, btnEl) {
     }
   }
 
-  if (tab === "visite") caricaVisiteTab();
-  if (tab === "miei") caricaMieiContenuti();
+  if (tab === "visite") loadVisitsTab();
+  if (tab === "miei") loadMyContent();
 }
 
-async function caricaMuseiFiltro() {
-  const config = await caricaConfigMuseo();
+async function loadMuseumFilters() {
+  const config = await loadMuseumConfig();
   if (!config) return;
 
   const container = document.getElementById("filtroMusei");
@@ -199,105 +207,114 @@ async function caricaMuseiFiltro() {
 
   container.innerHTML = "";
 
+  const museumName = config.museumName || config.museo || "Museo";
   const btn = document.createElement("button");
   btn.className = "aa-filter-btn active";
-  btn.dataset.museo = config.museo;
+  btn.dataset.museo = museumName;
   btn.textContent =
-    config.museo.length > 22
-      ? config.museo.substring(0, 20) + "…"
-      : config.museo;
-  btn.title = config.museo;
+    museumName.length > 22 ? museumName.substring(0, 20) + "…" : museumName;
+  btn.title = museumName;
   btn.addEventListener("click", () => {
     container
       .querySelectorAll(".aa-filter-btn")
       .forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
-    stato.filtri.museo = config.museo;
-    stato.paginaItems = 1;
-    caricaItems();
+    state.filters.museum = museumName;
+    state.itemsPage = 1;
+    loadItems();
   });
   container.appendChild(btn);
 }
 
-async function caricaConfigMuseo() {
+async function loadMuseumConfig() {
   try {
     const response = await fetch("/api/config");
-
-    if (!response.ok) {
-      throw new Error("Configurazione non trovata sul server");
-    }
-
-    const config = await response.json();
-    return config;
+    if (!response.ok) throw new Error("Museum config not found");
+    return await response.json();
   } catch (error) {
-    console.error("Errore nel caricamento della configurazione:", error);
+    console.error("Error loading config:", error);
     return null;
   }
 }
 
-async function caricaItems(pagina = stato.paginaItems) {
-  stato.paginaItems = pagina;
+async function loadItems(page = state.itemsPage) {
+  state.itemsPage = page;
   const grid = document.getElementById("itemsGrid");
   grid.innerHTML =
     '<div class="col-12 text-center py-5"><div class="aa-spinner"></div> Caricamento...</div>';
 
-  const qs = new URLSearchParams({
-    pagina,
-    limite: stato.limite,
-    ...(stato.filtri.museo && { museo: stato.filtri.museo }),
-    ...(stato.filtri.linguaggio && { linguaggio: stato.filtri.linguaggio }),
-    ...(stato.filtri.categoria && { categoria: stato.filtri.categoria }),
-    ...(stato.filtri.cerca && { cerca: stato.filtri.cerca }),
-    ...(stato.filtri.prezzo === "free" && { maxPrezzo: 0 }),
-    ...(stato.filtri.prezzo === "paid" && { minPrezzo: 0.01 }),
+  const queryParams = new URLSearchParams({
+    page,
+    limit: state.limit,
+    ...(state.filters.museum && { museum: state.filters.museum }),
+    ...(state.filters.language && { language: state.filters.language }),
+    ...(state.filters.category && { category: state.filters.category }),
+    ...(state.filters.search && { search: state.filters.search }),
+    ...(state.filters.price === "free" && { maxPrice: 0 }),
+    ...(state.filters.price === "paid" && { minPrice: 0.01 }),
   });
 
-  const data = await apiFetch(`/api/items?${qs}`);
-  if (!data) {
+  const response = await apiFetch(`/api/items?${queryParams}`);
+  if (!response) {
     grid.innerHTML =
       '<div class="col-12"><div class="aa-empty"><div class="aa-empty-icon">❌</div><p>Errore nel caricamento.</p></div></div>';
     return;
   }
 
-  if (!data.items.length) {
+  const itemsList = response.items || response.data?.items || [];
+  const totalPages = response.pages ?? response.pagine ?? 0;
+
+  if (!itemsList.length) {
     grid.innerHTML =
       '<div class="col-12"><div class="aa-empty"><div class="aa-empty-icon">🔍</div><h5>Nessun risultato</h5><p>Prova a modificare i filtri di ricerca.</p></div></div>';
-    renderPaginazione("paginazioneItems", pagina, 0, "caricaItems");
+    renderPagination("paginazioneItems", page, 0, "loadItems");
     return;
   }
 
-  grid.innerHTML = data.items.map((item) => renderItemCard(item)).join("");
-  renderPaginazione("paginazioneItems", pagina, data.pagine, "caricaItems");
+  grid.innerHTML = itemsList.map((item) => renderItemCard(item)).join("");
+  renderPagination("paginazioneItems", page, totalPages, "loadItems");
 }
 
 function renderItemCard(item) {
+  const title = item.title || item.titolo || "Item";
+  const desc = item.description || item.descrizione || "";
+  const category = item.category || item.categoria || "altro";
+  const language = item.language || item.linguaggio || "medium";
+  const length = item.length || item.lunghezza || "15s";
+  const price = Number(item.price ?? item.prezzo ?? 0);
+  const license =
+    item.license?.type ||
+    item.licenza?.tipo ||
+    item.license ||
+    item.licenza ||
+    "–";
+
   const img = item.url
-    ? `<img src="${item.url}" class="card-img-top" alt="${item.titolo}" onerror="this.style.display='none'">`
-    : `<div class="aa-item-placeholder">${iconaCategoria(item.categoria)}</div>`;
+    ? `<img src="${item.url}" class="card-img-top" alt="${title}" onerror="this.style.display='none'">`
+    : `<div class="aa-item-placeholder">${getCategoryIcon(category)}</div>`;
 
   return `
     <div class="col-sm-6 col-md-4 col-xl-3">
-      <div class="aa-item-card" style="cursor:pointer" onclick="apriItemModal('${item._id}')">
+      <div class="aa-item-card" style="cursor:pointer" onclick="openItemModal('${item._id}')">
         ${img}
         <div class="card-body">
-          <div class="card-title">${item.titolo}</div>
+          <div class="card-title">${title}</div>
           <div class="d-flex gap-1 flex-wrap mb-2">
-            ${badgeLinguaggio(item.linguaggio)}
-            ${badgeLunghezza(item.lunghezza)}
+            ${badgeLinguaggio(language)}${badgeLunghezza(length)}
           </div>
-          <p class="card-text">${item.descrizione}</p>
+          <p class="card-text">${desc}</p>
         </div>
         <div class="card-footer">
-          ${badgePrezzo(item.prezzo)}
-          <span class="text-slate" style="font-size:0.72rem">${item.licenza?.tipo || "–"}</span>
+          ${badgePrezzo(price)}
+          <span class="text-slate" style="font-size:0.72rem">${license}</span>
         </div>
       </div>
     </div>
   `;
 }
 
-function iconaCategoria(cat) {
-  const mappa = {
+function getCategoryIcon(category) {
+  const iconMap = {
     pittura: "🖼️",
     scultura: "🗿",
     architettura: "🏛️",
@@ -307,26 +324,48 @@ function iconaCategoria(cat) {
     decorativa: "🪆",
     altro: "🔍",
   };
-  return mappa[cat] || "🔍";
+  return iconMap[category] || "🔍";
 }
 
-async function apriItemModal(id) {
+async function openItemModal(id) {
   const modal = document.getElementById("itemModal");
   modal.classList.remove("d-none");
   document.getElementById("modalItemTitolo").textContent = "Caricamento…";
-
   document.getElementById("modalItemBody").innerHTML =
     '<div class="text-center py-4"><div class="aa-spinner"></div></div>';
-  document.getElementById("modalItemFooter").innerHTML = "";
-  document.getElementById("modalItemFooter").classList.remove("d-none");
 
-  const item = await apiFetch(`/api/items/${id}`);
+  const footerElement = document.getElementById("modalItemFooter");
+  footerElement.innerHTML = "";
+  footerElement.classList.remove("d-none");
+
+  const response = await apiFetch(`/api/items/${id}`);
+  const item = response?.data || response;
   if (!item) {
     modal.classList.add("d-none");
     return;
   }
 
-  document.getElementById("modalItemTitolo").textContent = item.titolo;
+  const title = item.title || item.titolo || "Item";
+  const desc =
+    item.description || item.descrizione || "Nessuna descrizione inserita.";
+  const museum = item.museum || item.museo || "–";
+  const artworkId = item.artworkId || item.operaId || "–";
+  const language = item.language || item.linguaggio || "medium";
+  const length = item.length || item.lunghezza || "15s";
+  const category = item.category || item.categoria || "altro";
+  const contentDepth = item.contentDepth || item.profonditaContenuto || "–";
+  const price = Number(item.price ?? item.prezzo ?? 0);
+  const authorName =
+    item.creatorId?.username || item.tourAuthor || item.autore_visita || "–";
+  const licenseType =
+    item.license?.type ||
+    item.licenza?.tipo ||
+    item.license ||
+    item.licenza ||
+    "–";
+  const sales = item.salesLogs || item.logVendite || [];
+
+  document.getElementById("modalItemTitolo").textContent = title;
 
   const mediaHTML = item.url
     ? `<img src="${item.url}" class="img-fluid rounded border border-soft w-100" style="max-height: 250px; object-fit: cover;" alt="">`
@@ -346,19 +385,18 @@ async function apriItemModal(id) {
             Classificazione Item
           </div>
           <div class="d-flex flex-wrap gap-1 mb-3">
-            ${badgeLinguaggio(item.linguaggio)}
-            ${badgeLunghezza(item.lunghezza)}
-            <span class="badge aa-badge aa-badge-len">${item.categoria}</span>
-            <span class="badge aa-badge aa-badge-len">Prof.: ${item.profonditaContenuto}</span>
+            ${badgeLinguaggio(language)}${badgeLunghezza(length)}
+            <span class="badge aa-badge aa-badge-len">${category}</span>
+            <span class="badge aa-badge aa-badge-len">Prof.: ${contentDepth}</span>
           </div>
         </div>
 
         <div class="p-2 rounded bg-cream border border-soft shadow-sm" style="font-size: 0.85rem;">
           <div class="row g-2">
-            <div class="col-6"><span class="aa-label m-0" style="font-size:0.7rem;">Opera ID</span><div class="fw-semibold text-charcoal">${item.operaId || "–"}</div></div>
-            <div class="col-6"><span class="aa-label m-0" style="font-size:0.7rem;">Museo</span><div class="fw-semibold text-charcoal">${item.museo || "–"}</div></div>
-            <div class="col-6"><span class="aa-label">Autore</span><div>${item.creatorId?.username || item.autore_visita || "–"}</div></div>
-            <div class="col-6"><span class="aa-label m-0" style="font-size:0.7rem;">Licenza</span><div class="text-slate fw-semibold">${item.licenza?.tipo || item.licenza || "–"}</div></div>
+            <div class="col-6"><span class="aa-label m-0" style="font-size:0.7rem;">Opera ID</span><div class="fw-semibold text-charcoal">${artworkId}</div></div>
+            <div class="col-6"><span class="aa-label m-0" style="font-size:0.7rem;">Museo</span><div class="fw-semibold text-charcoal">${museum}</div></div>
+            <div class="col-6"><span class="aa-label">Autore</span><div>${authorName}</div></div>
+            <div class="col-6"><span class="aa-label m-0" style="font-size:0.7rem;">Licenza</span><div class="text-slate fw-semibold">${licenseType}</div></div>
           </div>
         </div>
       </div>
@@ -371,7 +409,7 @@ async function apriItemModal(id) {
         Contenuto Testuale (Sintesi Vocale)
       </div>
       <p class="text-charcoal px-3 py-3 rounded bg-cream border-soft" style="font-size: 0.95rem; line-height: 1.6; border-left: 3px solid var(--aa-taupe); margin: 0;">
-        ${item.descrizione || "Nessuna descrizione inserita."}
+        ${desc}
       </p>
     </div>
 
@@ -380,63 +418,63 @@ async function apriItemModal(id) {
         ${item.tags?.length ? item.tags.map((t) => `<span class="badge aa-badge aa-badge-len me-1">${t}</span>`).join("") : "–"}
       </div>
       <div>
-        ${item.logVendite?.length > 0 ? `<span class="text-slate small"><i class="bi bi-graph-up"></i> ${item.logVendite.length} vendite</span>` : ""}
+        ${sales.length > 0 ? `<span class="text-slate small"><i class="bi bi-graph-up"></i> ${sales.length} vendite</span>` : ""}
       </div>
     </div>
   `;
 
   let footerHtml = ``;
-  const u = getUtenteCorrente();
-  const footerElement = document.getElementById("modalItemFooter");
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
 
-  if (!u) {
+  if (!currentUser) {
     footerElement.innerHTML = "";
     footerElement.classList.add("d-none");
     return;
   }
 
-  const idCreatoreItem = item.creatorId?._id || item.creatorId;
-  const isProprietarioItem =
-    u &&
-    ((idCreatoreItem && String(idCreatoreItem) === String(u._id)) ||
-      (item.autore_visita &&
-        String(item.autore_visita) === String(u.username)));
+  const itemCreatorId = item.creatorId?._id || item.creatorId;
+  const isOwner =
+    (itemCreatorId && String(itemCreatorId) === String(currentUser._id)) ||
+    (item.tourAuthor &&
+      String(item.tourAuthor) === String(currentUser.username)) ||
+    (item.autore_visita &&
+      String(item.autore_visita) === String(currentUser.username));
 
-  const giaAcquistatoItem =
-    u &&
-    Array.isArray(item.logVendite) &&
-    item.logVendite.some((log) => {
-      const idAcquirente = log.acquirenteId?._id || log.acquirenteId;
-      return idAcquirente === u._id;
+  const alreadyPurchased =
+    Array.isArray(sales) &&
+    sales.some((log) => {
+      const buyerId =
+        log.buyerId?._id ||
+        log.buyerId ||
+        log.acquirenteId?._id ||
+        log.acquirenteId;
+      return String(buyerId) === String(currentUser._id);
     });
 
-  if (isProprietarioItem) {
+  if (isOwner) {
     footerHtml = `
       <span class="text-taupe small me-auto align-self-center fw-semibold">
         <i class="bi bi-person-check-fill"></i> Questo contenuto è stato creato da te
       </span>
     `;
-  } else if (giaAcquistatoItem) {
+  } else if (alreadyPurchased) {
     footerHtml = `
       <span class="text-success small me-auto align-self-center fw-semibold">
         <i class="bi bi-check-circle-fill"></i> Acquistato
       </span>
     `;
   } else {
-    const titoloItemEscaped = (item.titolo || "Item")
-      .replace(/'/g, "\\'")
-      .replace(/"/g, "&quot;");
-    const prezzoItem = item.prezzo ? Number(item.prezzo) : 0;
-
-    if (prezzoItem > 0) {
+    const escapedTitle = title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+    if (price > 0) {
       footerHtml += `
-        <button class="btn-aa-gold" id="btnAcquistaItem" onclick="eseguiAcquistoDnAdozioneItem('${item._id}', '${titoloItemEscaped}', ${prezzoItem})">
-          <i class="bi bi-bag-check"></i> Acquista €${prezzoItem.toFixed(2)}
+        <button class="btn-aa-gold" id="btnAcquistaItem" onclick="handleItemPurchaseOrAdopt('${item._id}', '${escapedTitle}',${price})">
+          <i class="bi bi-bag-check"></i> Acquista €${price.toFixed(2)}
         </button>
       `;
     } else {
       footerHtml += `
-        <button class="btn-aa-primary" id="btnAdottaItem" onclick="eseguiAcquistoDnAdozioneItem('${item._id}', '${titoloItemEscaped}', 0)">
+        <button class="btn-aa-primary" id="btnAdottaItem" onclick="handleItemPurchaseOrAdopt('${item._id}', '${escapedTitle}', 0)">
           Acquista Gratis
         </button>
       `;
@@ -445,136 +483,140 @@ async function apriItemModal(id) {
 
   footerElement.innerHTML = footerHtml;
   footerElement.classList.remove("d-none");
-  e;
 }
 
-async function acquistaItem(itemId) {
-  const u = getUtenteCorrente();
-  if (!u) return showToast("Accedi per acquistare", "error");
-  const ok = await apiFetch(`/api/items/${itemId}/acquista`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ acquirenteId: u._id }),
-  });
-  if (ok) {
-    showToast("Acquisto completato!", "success");
-    chiudiItemModal();
-  }
-}
-
-function chiudiItemModal() {
+function closeItemModal() {
   document.getElementById("itemModal").classList.add("d-none");
 }
 
-async function apriVisitaModal(id) {
+async function openVisitModal(id) {
   const modal = document.getElementById("visitaModal");
   modal.classList.remove("d-none");
   document.getElementById("modalVisitaTitolo").textContent = "Caricamento…";
   document.getElementById("modalVisitaBody").innerHTML =
     '<div class="text-center py-4"><div class="aa-spinner"></div></div>';
-  document.getElementById("modalVisitaFooter").innerHTML = "";
 
-  const v = await apiFetch(`/api/visite/${id}`);
-  if (!v) {
+  const footerElement = document.getElementById("modalVisitaFooter");
+  footerElement.innerHTML = "";
+
+  const response = await apiFetch(`/api/visits/${id}`);
+  const visit = response?.data || response;
+  if (!visit) {
     modal.classList.add("d-none");
     return;
   }
 
-  document.getElementById("modalVisitaTitolo").textContent =
-    v.titolo || v.title || "Visita";
+  const title = visit.title || visit.titolo || "Visita";
+  const museum = visit.museum || visit.museo || "Nessun museo";
+  const desc =
+    visit.description ||
+    visit.descrizione ||
+    "Nessuna descrizione disponibile.";
+  const price = Number(visit.price ?? visit.prezzo ?? 0);
+  const duration =
+    visit.totalEstimatedDuration || visit.durataTotaleStimata || 60;
+  const baseLevel = visit.baseLevel || visit.livello_base || "medium";
+  const authorName =
+    visit.creatorId?.username || visit.author || visit.autore || "–";
+  const licenseType = visit.license?.type || visit.licenza?.tipo || "–";
+  const stops = visit.stops || visit.tappe || [];
 
-  let tappeHtml =
+  document.getElementById("modalVisitaTitolo").textContent = title;
+
+  let stopsHtml =
     '<em class="text-slate small">Nessuna tappa inserita nel percorso.</em>';
-  if (v.tappe && v.tappe.length > 0) {
-    tappeHtml = v.tappe
-      .map((t) => {
-        const infoItem = t.item_default || {};
-        const nomeTappa = infoItem.titolo || "Tappa inesistente";
-        const idOpera = infoItem.operaId || "";
-        return `<div class="d-flex align-items-center gap-2 mb-2 p-2 rounded" style="background:var(--aa-cream)">
-                <span class="aa-badge aa-badge-len" style="background:white">${t.ordine}</span>
-                <div class="flex-grow-1" style="font-size:0.85rem">
-                  <strong>${nomeTappa}</strong> <span class="text-slate mx-1">·</span> <small>${idOpera}</small>
-                </div>
-                ${t.opzionale ? '<span style="font-size:0.7rem; color:var(--aa-slate)">Opzionale</span>' : ""}
-              </div>`;
+  if (stops.length > 0) {
+    stopsHtml = stops
+      .map((stop) => {
+        const itemInfo = stop.defaultItem || stop.item_default || {};
+        const stopName = itemInfo.title || itemInfo.titolo || "Tappa";
+        const stopArtworkId = itemInfo.artworkId || itemInfo.operaId || "";
+        const orderNum = stop.order ?? stop.ordine ?? 1;
+        const isOptional = stop.isOptional ?? stop.opzionale ?? false;
+
+        return `
+          <div class="d-flex align-items-center gap-2 mb-2 p-2 rounded" style="background:var(--aa-cream)">
+            <span class="aa-badge aa-badge-len" style="background:white">${orderNum}</span>
+            <div class="flex-grow-1" style="font-size:0.85rem">
+              <strong>${stopName}</strong> <span class="text-slate mx-1">·</span> <small>${stopArtworkId}</small>
+            </div>
+            ${isOptional ? '<span style="font-size:0.7rem; color:var(--aa-slate)">Opzionale</span>' : ""}
+          </div>`;
       })
       .join("");
   }
 
-  // 🌟 AGGIORNATO: Inserito v.autore come paracadute per mostrare sempre il creatore
   document.getElementById("modalVisitaBody").innerHTML = `
     <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
-      <span class="aa-badge aa-badge-len">🏛️ ${v.museo || "Nessun museo"}</span>
-      <span class="aa-badge aa-badge-len"><i class="bi bi-clock"></i> ~${v.durataTotaleStimata || 60} min</span>
-      ${badgeLinguaggio(v.livello_base)}
-      ${badgePrezzo(v.prezzo)}
+      <span class="aa-badge aa-badge-len">🏛️ ${museum}</span>
+      <span class="aa-badge aa-badge-len"><i class="bi bi-clock"></i> ~${duration} min</span>
+      ${badgeLinguaggio(baseLevel)}${badgePrezzo(price)}
     </div>
-    <p style="line-height:1.7">${v.descrizione || "Nessuna descrizione disponibile."}</p>
+    <p style="line-height:1.7">${desc}</p>
     <div class="divider"></div>
     <div class="row g-2 text-sm mb-3">
-      <div class="col-6"><span class="aa-label">Autore</span><div>${v.creatorId?.username || v.autore || "–"}</div></div>
-      <div class="col-6"><span class="aa-label">Licenza</span><div>${v.licenza?.tipo || "–"}</div></div>
+      <div class="col-6"><span class="aa-label">Autore</span><div>${authorName}</div></div>
+      <div class="col-6"><span class="aa-label">Licenza</span><div>${licenseType}</div></div>
     </div>
-    ${v.tags?.length ? `<div class="mb-3">${v.tags.map((t) => `<span class="aa-badge aa-badge-len me-1">${t}</span>`).join("")}</div>` : ""}
+    ${visit.tags?.length ? `<div class="mb-3">${visit.tags.map((t) => `<span class="aa-badge aa-badge-len me-1">${t}</span>`).join("")}</div>` : ""}
     
     <div class="aa-sidebar-title mt-4" style="font-size: 0.72rem"><i class="bi bi-geo-alt"></i> Percorso della visita</div>
     <div class="pe-2">
-        ${tappeHtml}
+        ${stopsHtml}
     </div>
   `;
 
   let footerHtml = ``;
-  const u = getUtenteCorrente();
-  const footerElement = document.getElementById("modalVisitaFooter");
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
 
-  if (!u) {
+  if (!currentUser) {
     footerElement.innerHTML = "";
     footerElement.classList.add("d-none");
     return;
   }
 
-  const idCreatoreVisita = v.creatorId?._id || v.creatorId;
-  const isProprietarioVisita =
-    u &&
-    ((idCreatoreVisita && String(idCreatoreVisita) === String(u._id)) ||
-      (v.autore && String(v.autore) === String(u.username)));
+  const visitCreatorId = visit.creatorId?._id || visit.creatorId;
+  const isOwner =
+    (visitCreatorId && String(visitCreatorId) === String(currentUser._id)) ||
+    (visit.author && String(visit.author) === String(currentUser.username)) ||
+    (visit.autore && String(visit.autore) === String(currentUser.username));
 
-  const giaAdottataVisita =
-    u &&
-    Array.isArray(v.logAdozioni) &&
-    v.logAdozioni.some((log) => {
-      const idAdottante = log.adottanteId?._id || log.adottanteId;
-      return idAdottante === u._id;
+  const adoptions = visit.adoptionLogs || visit.logAdozioni || [];
+  const alreadyAdopted =
+    Array.isArray(adoptions) &&
+    adoptions.some((log) => {
+      const adopterId =
+        log.adopterId?._id ||
+        log.adopterId ||
+        log.adottanteId?._id ||
+        log.adottanteId;
+      return String(adopterId) === String(currentUser._id);
     });
 
-  if (isProprietarioVisita) {
+  if (isOwner) {
     footerHtml = `
       <span class="text-taupe small me-auto align-self-center fw-semibold">
         <i class="bi bi-person-check-fill"></i> Questo percorso è stato creato da te
       </span>
     `;
-  } else if (giaAdottataVisita) {
+  } else if (alreadyAdopted) {
     footerHtml = `
       <span class="text-success small me-auto align-self-center fw-semibold">
         <i class="bi bi-check-circle-fill"></i> Visita acquistata
       </span>
     `;
   } else {
-    const titoloVisitaEscaped = (v.titolo || v.title || "Visita")
-      .replace(/'/g, "\\'")
-      .replace(/"/g, "&quot;");
-    const prezzoVisita = v.prezzo ? Number(v.prezzo) : 0;
-
-    if (prezzoVisita > 0) {
+    const escapedTitle = title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+    if (price > 0) {
       footerHtml += `
-        <button class="btn-aa-gold" id="btnAcquistaVisita" onclick="eseguiAcquistoDnAdozioneVisita('${v._id}', '${titoloVisitaEscaped}', ${prezzoVisita})">
-          <i class="bi bi-bag-check"></i> Acquista €${prezzoVisita.toFixed(2)}
+        <button class="btn-aa-gold" id="btnAcquistaVisita" onclick="handleVisitPurchaseOrAdopt('${visit._id}', '${escapedTitle}', ${price})">
+          <i class="bi bi-bag-check"></i> Acquista €${price.toFixed(2)}
         </button>
       `;
     } else {
       footerHtml += `
-        <button class="btn-aa-primary" id="btnAdottaVisita" onclick="eseguiAcquistoDnAdozioneVisita('${v._id}', '${titoloVisitaEscaped}', 0)">
+        <button class="btn-aa-primary" id="btnAdottaVisita" onclick="handleVisitPurchaseOrAdopt('${visit._id}', '${escapedTitle}', 0)">
           Acquista Gratis
         </button>
       `;
@@ -585,208 +627,199 @@ async function apriVisitaModal(id) {
   footerElement.classList.remove("d-none");
 }
 
-function chiudiVisitaModal() {
+function closeVisitModal() {
   document.getElementById("visitaModal").classList.add("d-none");
 }
 
-async function caricaVisiteTab(pagina = stato.paginaVisite) {
-  stato.paginaVisite = pagina;
+async function loadVisitsTab(page = state.visitsPage) {
+  state.visitsPage = page;
   const grid = document.getElementById("visiteGrid");
   grid.innerHTML =
     '<div class="col-12 text-center py-5"><div class="aa-spinner"></div></div>';
 
-  const u = getUtenteCorrente();
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
 
-  const qs = new URLSearchParams({
-    pagina,
-    limite: stato.limite,
-    ...(stato.filtri.museo && { museo: stato.filtri.museo }),
-    ...(u && { includiPrivateCreatorId: u._id }),
+  const queryParams = new URLSearchParams({
+    page,
+    limit: state.limit,
+    ...(state.filters.museum && { museum: state.filters.museum }),
+    ...(currentUser && { includePrivateCreatorId: currentUser._id }),
   });
 
-  const data = await apiFetch(`/api/visite?${qs}`);
-  if (!data || !data.visite.length) {
+  const response = await apiFetch(`/api/visits?${queryParams}`);
+  const visitsList =
+    response?.visits || response?.data?.visits || response?.data || [];
+  const totalPages = response?.pages ?? response?.pagine ?? 0;
+
+  if (!visitsList.length) {
     grid.innerHTML =
       '<div class="col-12"><div class="aa-empty"><div class="aa-empty-icon">🗺️</div><h5>Nessuna visita disponibile</h5><p>Crea la prima visita dall\'Editor.</p><a href="/editor-visita" class="btn-aa-primary mt-2">Crea Visita</a></div></div>';
     return;
   }
 
-  const visiteFiltrate = data.visite.filter((v) => {
-    if (v.pubblica !== false) return true;
-    if (!u) return false;
-    const idCreatore = v.creatorId?._id || v.creatorId;
-    const isAutorePerId = idCreatore && String(idCreatore) === String(u._id);
-    const isAutorePerStringa =
-      v.autore && String(v.autore) === String(u.username);
-    return isAutorePerId || isAutorePerStringa;
+  const filteredVisits = visitsList.filter((v) => {
+    const isPublic = v.isPublic ?? v.pubblica ?? true;
+    if (isPublic) return true;
+    if (!currentUser) return false;
+
+    const creatorId = v.creatorId?._id || v.creatorId;
+    const isOwnerById =
+      creatorId && String(creatorId) === String(currentUser._id);
+    const isOwnerByUsername =
+      (v.author && String(v.author) === String(currentUser.username)) ||
+      (v.autore && String(v.autore) === String(currentUser.username));
+    return isOwnerById || isOwnerByUsername;
   });
 
-  if (!visiteFiltrate.length) {
+  if (!filteredVisits.length) {
     grid.innerHTML =
       '<div class="col-12"><div class="aa-empty"><div class="aa-empty-icon">🗺️</div><h5>Nessuna visita disponibile</h5><p>Nessuna visita corrispondente ai criteri.</p></div></div>';
     return;
   }
 
-  grid.innerHTML = visiteFiltrate.map((v) => renderVisitaCard(v)).join("");
-  renderPaginazione(
-    "paginazioneVisite",
-    pagina,
-    data.pagine,
-    "caricaVisiteTab",
-  );
+  grid.innerHTML = filteredVisits.map((v) => renderVisitaCard(v)).join("");
+  renderPagination("paginazioneVisite", page, totalPages, "loadVisitsTab");
 }
 
 function renderVisitaCard(v) {
-  const itemsObbligatori =
-    v.tappe?.filter((i) => !i.opzionale).length ||
-    v.items?.filter((i) => !i.opzionale).length ||
-    0;
-  const itemsOpzionali =
-    v.tappe?.filter((i) => i.opzionale).length ||
-    v.items?.filter((i) => i.opzionale).length ||
-    0;
+  const stops = v.stops || v.tappe || [];
+  const mandatoryStops = stops.filter(
+    (s) => !(s.isOptional ?? s.opzionale),
+  ).length;
+  const optionalStops = stops.filter((s) => s.isOptional ?? s.opzionale).length;
+  const title = v.title || v.titolo || "Visita Senza Nome";
+  const museum = v.museum || v.museo || "Nessun museo";
+  const desc = v.description || v.descrizione || "Nessuna descrizione.";
+  const duration = v.totalEstimatedDuration || v.durataTotaleStimata || 60;
+  const price = Number(v.price ?? v.prezzo ?? 0);
 
   return `
     <div class="col-md-6 col-xl-4">
-      <div class="aa-visita-card" style="cursor:pointer" onclick="apriVisitaModal('${v._id}')">
+      <div class="aa-visita-card" style="cursor:pointer" onclick="openVisitModal('${v._id}')">
         <div class="vcard-header">
-          <h5>${v.titolo || v.title || "Visita Senza Nome"}</h5>
-          <small style="opacity:0.65">${v.museo || "Nessun museo"}</small>
+          <h5>${title}</h5>
+          <small style="opacity:0.65">${museum}</small>
         </div>
         <div class="vcard-body">
-          <p class="small text-slate mb-3" style="line-height:1.5">${(v.descrizione || "Nessuna descrizione.").substring(0, 100)}...</p>
+          <p class="small text-slate mb-3" style="line-height:1.5">${desc.substring(0, 100)}...</p>
           <div class="d-flex gap-3 mb-3 text-slate" style="font-size:0.8rem">
-            <span><i class="bi bi-list-ol"></i> ${itemsObbligatori} obb.</span>
-            <span><i class="bi bi-dash-circle"></i> ${itemsOpzionali} opz.</span>
-            <span><i class="bi bi-clock"></i> ~${v.durataTotaleStimata || 60} min</span>
+            <span><i class="bi bi-list-ol"></i> ${mandatoryStops} obb.</span>
+            <span><i class="bi bi-dash-circle"></i> ${optionalStops} opz.</span>
+            <span><i class="bi bi-clock"></i> ~${duration} min</span>
           </div>
           ${v.tags?.length ? `<div class="mb-3">${v.tags.map((t) => `<span class="aa-badge aa-badge-len">${t}</span>`).join("")}</div>` : ""}
         </div>
-        
         <div class="d-flex justify-content-between align-items-center mt-1 mb-2" style="padding-left: 12px;">
-              ${badgePrezzo(v.prezzo)}
+          ${badgePrezzo(price)}
         </div>
-        
       </div>
     </div>
   `;
 }
 
-async function adottaVisita(visitaId) {
-  const u = getUtenteCorrente();
-  if (!u) return showToast("Accedi per adottare una visita", "error");
-  const ok = await apiFetch(`/api/visite/${visitaId}/adotta`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ adottanteId: u._id }),
-  });
-  if (ok) showToast("Visita adottata e salvata nel tuo profilo!", "success");
-}
-
-async function eseguiAcquistoDnAdozioneVisita(visitaId, titolo, prezzo) {
-  const u = getUtenteCorrente();
-  if (!u) {
+async function handleVisitPurchaseOrAdopt(visitId, title, price) {
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
+  if (!currentUser) {
     showToast(
-      `Accedi per poter ${prezzo > 0 ? "acquistare" : "adottare"} questa visita.`,
+      `Accedi per poter ${price > 0 ? "acquistare" : "adottare"} questa visita.`,
       "error",
     );
-    apriLogin();
+    if (typeof apriLogin === "function") apriLogin();
     return;
   }
 
   try {
-    const visita = await apiFetch(`/api/visite/${visitaId}`);
-    const idCreatore = visita?.creatorId?._id || visita?.creatorId;
+    const res = await apiFetch(`/api/visits/${visitId}`);
+    const visit = res?.data || res;
+    const creatorId = visit?.creatorId?._id || visit?.creatorId;
 
-    if (idCreatore && String(idCreatore) === String(u._id)) {
+    if (creatorId && String(creatorId) === String(currentUser._id)) {
       showToast(
         "Operazione annullata: non puoi acquistare o adottare una visita creata da te.",
         "error",
       );
-      chiudiVisitaModal();
+      closeVisitModal();
       return;
     }
 
-    const response = await apiFetch(`/api/visite/${visitaId}/adotta`, {
+    const response = await apiFetch(`/api/visits/${visitId}/adopt`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ adottanteId: u._id }),
+      body: JSON.stringify({ adopterId: currentUser._id }),
     });
 
     if (response) {
-      const messaggio =
-        prezzo > 0
-          ? `"${titolo}" acquistata correttamente e salvata nel tuo profilo!`
-          : `"${titolo}" adottata correttamente e salvata nel tuo profilo!`;
+      const msg =
+        price > 0
+          ? `"${title}" acquistata correttamente e salvata nel tuo profilo!`
+          : `"${title}" adottata correttamente e salvata nel tuo profilo!`;
 
-      showToast(messaggio, "success");
-      chiudiVisitaModal();
-
-      if (typeof caricaVisiteTab === "function") caricaVisiteTab();
+      showToast(msg, "success");
+      closeVisitModal();
+      loadVisitsTab();
     }
   } catch (error) {
-    console.error("Errore durante il salvataggio della visita:", error);
+    console.error("Error adopting/purchasing visit:", error);
     showToast("Errore di rete durante il salvataggio nel database.", "error");
   }
 }
 
-async function eseguiAcquistoDnAdozioneItem(itemId, titolo, prezzo) {
-  const u = getUtenteCorrente();
-  if (!u) {
+async function handleItemPurchaseOrAdopt(itemId, title, price) {
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
+  if (!currentUser) {
     showToast(
-      `Accedi per poter ${prezzo > 0 ? "acquistare" : "adottare"} questo contenuto.`,
+      `Accedi per poter ${price > 0 ? "acquistare" : "adottare"} questo contenuto.`,
       "error",
     );
-    apriLogin();
+    if (typeof apriLogin === "function") apriLogin();
     return;
   }
 
   try {
-    const item = await apiFetch(`/api/items/${itemId}`);
-    const idCreatore = item?.creatorId?._id || item?.creatorId;
+    const res = await apiFetch(`/api/items/${itemId}`);
+    const item = res?.data || res;
+    const creatorId = item?.creatorId?._id || item?.creatorId;
 
-    if (idCreatore && String(idCreatore) === String(u._id)) {
+    if (creatorId && String(creatorId) === String(currentUser._id)) {
       showToast(
         "Operazione annullata: non puoi acquistare o adottare un contenuto creato da te.",
         "error",
       );
-      chiudiItemModal();
+      closeItemModal();
       return;
     }
 
-    const endpoint =
-      prezzo > 0
-        ? `/api/items/${itemId}/acquista`
-        : `/api/items/${itemId}/adotta`;
-
-    const response = await apiFetch(endpoint, {
+    const response = await apiFetch(`/api/items/${itemId}/purchase`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ utenteId: u._id }),
+      body: JSON.stringify({ buyerId: currentUser._id }),
     });
 
     if (response) {
-      const messaggio =
-        prezzo > 0
-          ? `"${titolo}" acquistato correttamente e salvato nel tuo profilo!`
-          : `"${titolo}" adottato correttamente e salvato nel tuo profilo!`;
+      const msg =
+        price > 0
+          ? `"${title}" acquistato correttamente e salvato nel tuo profilo!`
+          : `"${title}" adottato correttamente e salvato nel tuo profilo!`;
 
-      showToast(messaggio, "success");
-      chiudiItemModal();
-
-      if (typeof caricaItems === "function") caricaItems();
+      showToast(msg, "success");
+      closeItemModal();
+      loadItems();
     }
   } catch (error) {
-    console.error("Errore durante il salvataggio dell'item:", error);
+    console.error("Error purchasing item:", error);
     showToast("Errore di rete durante il salvataggio nel database.", "error");
   }
 }
 
-async function caricaMieiContenuti() {
-  const u = getUtenteCorrente();
+async function loadMyContent() {
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
   const container = document.getElementById("mieiContenuti");
 
-  if (!u) {
+  if (!currentUser) {
     container.innerHTML = `
       <div class="aa-empty">
         <div class="aa-empty-icon">🔐</div>
@@ -800,46 +833,56 @@ async function caricaMieiContenuti() {
   container.innerHTML =
     '<div class="text-center py-4"><div class="aa-spinner"></div></div>';
 
-  const [dataItems, dataVisiteCreate, dataVisiteAdottate] = await Promise.all([
-    apiFetch(`/api/items?pubblicato=tutti&limite=100`),
-    apiFetch(`/api/visite?pubblica=tutti&creatorId=${u._id}&limite=100`),
-    apiFetch(`/api/visite?soloMie=true&limite=100`),
+  const [dataItems, dataVisitsCreated, dataVisitsAdopted] = await Promise.all([
+    apiFetch(`/api/items?published=all&limit=100`),
+    apiFetch(`/api/visits?isPublic=all&creatorId=${currentUser._id}&limit=100`),
+    apiFetch(`/api/visits?myVisits=true&limit=100`),
   ]);
 
-  const mieiItemsCreati = dataItems?.items
-    ? dataItems.items.filter((i) => (i.creatorId?._id || i.creatorId) === u._id)
-    : [];
+  const itemsList = dataItems?.items || dataItems?.data?.items || [];
+  const createdVisitsList =
+    dataVisitsCreated?.visits || dataVisitsCreated?.data?.visits || [];
+  const adoptedVisitsList =
+    dataVisitsAdopted?.visits || dataVisitsAdopted?.data?.visits || [];
 
-  const mieiItemsAcquistati = dataItems?.items
-    ? dataItems.items.filter((i) => {
-        const nonMio = (i.creatorId?._id || i.creatorId) !== u._id;
-        const acquistato = i.logVendite?.some(
-          (log) => (log.acquirenteId?._id || log.acquirenteId) === u._id,
-        );
-        return nonMio && acquistato;
-      })
-    : [];
+  const myCreatedItems = itemsList.filter(
+    (i) => (i.creatorId?._id || i.creatorId) === currentUser._id,
+  );
 
-  const mieVisiteCreate = dataVisiteCreate?.visite || [];
+  const myPurchasedItems = itemsList.filter((i) => {
+    const isNotMine = (i.creatorId?._id || i.creatorId) !== currentUser._id;
+    const sales = i.salesLogs || i.logVendite || [];
+    const purchased = sales.some(
+      (log) =>
+        (log.buyerId?._id ||
+          log.buyerId ||
+          log.acquirenteId?._id ||
+          log.acquirenteId) === currentUser._id,
+    );
+    return isNotMine && purchased;
+  });
 
-  const mieVisiteAcquistate = dataVisiteAdottate?.visite
-    ? dataVisiteAdottate.visite.filter((v) => {
-        const nonMia = v.creatorId?._id !== u._id && v.creatorId !== u._id;
-        const adottataRealmente =
-          Array.isArray(v.logAdozioni) &&
-          v.logAdozioni.some(
-            (log) => (log.adottanteId?._id || log.adottanteId) === u._id,
-          );
-        return nonMia && adottataRealmente;
-      })
-    : [];
+  const myAdoptedVisits = adoptedVisitsList.filter((v) => {
+    const isNotMine = (v.creatorId?._id || v.creatorId) !== currentUser._id;
+    const adoptions = v.adoptionLogs || v.logAdozioni || [];
+    const adopted = adoptions.some(
+      (log) =>
+        (log.adopterId?._id ||
+          log.adopterId ||
+          log.adottanteId?._id ||
+          log.adottanteId) === currentUser._id,
+    );
+    return isNotMine && adopted;
+  });
 
-  if (["autore", "admin"].includes(u.ruolo)) {
+  const role = currentUser.role || currentUser.ruolo;
+
+  if (["author", "autore", "admin"].includes(role)) {
     if (
-      !mieiItemsCreati.length &&
-      !mieiItemsAcquistati.length &&
-      !mieVisiteCreate.length &&
-      !mieVisiteAcquistate.length
+      !myCreatedItems.length &&
+      !myPurchasedItems.length &&
+      !createdVisitsList.length &&
+      !myAdoptedVisits.length
     ) {
       container.innerHTML = `
         <div class="aa-empty">
@@ -850,85 +893,32 @@ async function caricaMieiContenuti() {
       return;
     }
 
-    let htmlRisultato = "";
+    let html = "";
 
-    if (mieiItemsCreati.length > 0) {
-      htmlRisultato += `
+    if (myCreatedItems.length > 0) {
+      html += `
         <div class="aa-card mb-4">
-          <div class="aa-card-header"><i class="bi bi-collection"></i> I miei Item Creati (${mieiItemsCreati.length})</div>
+          <div class="aa-card-header"><i class="bi bi-collection"></i> I miei Item Creati (${myCreatedItems.length})</div>
           <div class="aa-card-body p-0" style="overflow-x:auto;">
             <table class="aa-table">
               <thead><tr><th>Titolo</th><th>Museo</th><th>Linguaggio</th><th>Stato</th><th>Azioni</th></tr></thead>
               <tbody>
-                ${mieiItemsCreati
-                  .map(
-                    (item) => `
-                  <tr>
-                    <td><strong>${item.titolo}</strong><br><small class="text-slate">${item.operaId}</small></td>
-                    <td><small>${item.museo}</small></td>
-                    <td>${badgeLinguaggio(item.linguaggio)}</td>
-                    <td><span class="aa-badge ${item.pubblicato ? "aa-badge-free" : "aa-badge-len"}">${item.pubblicato ? "Pubblicato" : "Bozza"}</span></td>
-                    <td><a href="/editor-item?id=${item._id}" class="btn-aa-outline" style="font-size:0.75rem;padding:2px 8px">Modifica</a></td>
-                  </tr>
-                `,
-                  )
-                  .join("")}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      `;
-    }
-
-    if (mieiItemsAcquistati.length > 0) {
-      htmlRisultato += `
-        <div class="aa-card mb-4">
-          <div class="aa-card-header" style="background: var(--aa-gold-pale);"><i class="bi bi-bag-check"></i> Item Adottati / Acquistati (${mieiItemsAcquistati.length})</div>
-          <div class="aa-card-body p-0" style="overflow-x:auto;">
-            <table class="aa-table">
-              <thead><tr><th>Titolo Item</th><th>Museo</th><th>Autore Originale</th><th>Linguaggio</th><th>Azioni</th></tr></thead>
-              <tbody>
-                ${mieiItemsAcquistati
-                  .map(
-                    (item) => `
-                  <tr>
-                    <td><strong>${item.titolo}</strong></td>
-                    <td><small>${item.museo}</small></td>
-                    <td><span class="text-taupe">${item.autore_visita || "Community"}</span></td>
-                    <td>${badgeLinguaggio(item.linguaggio)}</td>
-                    <td>
-                      <button class="btn-aa-primary" style="font-size:0.75rem;padding:2px 8px" onclick="apriItemModal('${item._id}')">Visualizza</button>
-                    </td>
-                  </tr>
-                `,
-                  )
-                  .join("")}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      `;
-    }
-
-    if (mieVisiteCreate.length > 0) {
-      htmlRisultato += `
-        <div class="aa-card mb-4">
-          <div class="aa-card-header"><i class="bi bi-map"></i>Visite Create (${mieVisiteCreate.length})</div>
-          <div class="aa-card-body p-0" style="overflow-x:auto;">
-            <table class="aa-table">
-              <thead><tr><th>Titolo Visita</th><th>Museo</th><th>Tappe</th><th>Azioni</th></tr></thead>
-              <tbody>
-                ${mieVisiteCreate
-                  .map((v) => {
-                    const numTappe = v.tappe?.length || 0;
+                ${myCreatedItems
+                  .map((item) => {
+                    const title = item.title || item.titolo;
+                    const artworkId = item.artworkId || item.operaId;
+                    const museum = item.museum || item.museo;
+                    const lang = item.language || item.linguaggio;
+                    const isPub = item.isPublished ?? item.pubblicato;
                     return `
-                        <tr>
-                          <td><strong>${v.titolo || v.title || "Senza titolo"}</strong></td>
-                          <td><small>${v.museo}</small></td>
-                          <td><span class="aa-badge aa-badge-len">${numTappe} ${numTappe === 1 ? "tappa" : "tappe"}</span></td>
-                          <td><a href="/editor-visita?id=${v._id}" class="btn-aa-outline" style="font-size:0.75rem;padding:2px 8px">Modifica</a></td>
-                        </tr>
-                      `;
+                      <tr>
+                        <td><strong>${title}</strong><br><small class="text-slate">${artworkId}</small></td>
+                        <td><small>${museum}</small></td>
+                        <td>${badgeLinguaggio(lang)}</td>
+                        <td><span class="aa-badge ${isPub ? "aa-badge-free" : "aa-badge-len"}">${isPub ? "Pubblicato" : "Bozza"}</span></td>
+                        <td><a href="/editor-item?id=${item._id}" class="btn-aa-outline" style="font-size:0.75rem;padding:2px 8px">Modifica</a></td>
+                      </tr>
+                    `;
                   })
                   .join("")}
               </tbody>
@@ -938,10 +928,75 @@ async function caricaMieiContenuti() {
       `;
     }
 
-    if (mieVisiteAcquistate.length > 0) {
-      htmlRisultato += `
+    if (myPurchasedItems.length > 0) {
+      html += `
         <div class="aa-card mb-4">
-          <div class="aa-card-header"><i class="bi bi-bookmark-star"></i>Visite Acquistate (${mieVisiteAcquistate.length})</div>
+          <div class="aa-card-header" style="background: var(--aa-gold-pale);"><i class="bi bi-bag-check"></i> Item Adottati / Acquistati (${myPurchasedItems.length})</div>
+          <div class="aa-card-body p-0" style="overflow-x:auto;">
+            <table class="aa-table">
+              <thead><tr><th>Titolo Item</th><th>Museo</th><th>Autore Originale</th><th>Linguaggio</th><th>Azioni</th></tr></thead>
+              <tbody>
+                ${myPurchasedItems
+                  .map((item) => {
+                    const title = item.title || item.titolo;
+                    const museum = item.museum || item.museo;
+                    const author =
+                      item.tourAuthor || item.autore_visita || "Community";
+                    const lang = item.language || item.linguaggio;
+                    return `
+                      <tr>
+                        <td><strong>${title}</strong></td>
+                        <td><small>${museum}</small></td>
+                        <td><span class="text-taupe">${author}</span></td>
+                        <td>${badgeLinguaggio(lang)}</td>
+                        <td>
+                          <button class="btn-aa-primary" style="font-size:0.75rem;padding:2px 8px" onclick="openItemModal('${item._id}')">Visualizza</button>
+                        </td>
+                      </tr>
+                    `;
+                  })
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    if (createdVisitsList.length > 0) {
+      html += `
+        <div class="aa-card mb-4">
+          <div class="aa-card-header"><i class="bi bi-map"></i>Visite Create (${createdVisitsList.length})</div>
+          <div class="aa-card-body p-0" style="overflow-x:auto;">
+            <table class="aa-table">
+              <thead><tr><th>Titolo Visita</th><th>Museo</th><th>Tappe</th><th>Azioni</th></tr></thead>
+              <tbody>
+                ${createdVisitsList
+                  .map((v) => {
+                    const stopsCount = (v.stops || v.tappe || []).length;
+                    const title = v.title || v.titolo || "Senza titolo";
+                    const museum = v.museum || v.museo;
+                    return `
+                      <tr>
+                        <td><strong>${title}</strong></td>
+                        <td><small>${museum}</small></td>
+                        <td><span class="aa-badge aa-badge-len">${stopsCount}${stopsCount === 1 ? "tappa" : "tappe"}</span></td>
+                        <td><a href="/editor-visita?id=${v._id}" class="btn-aa-outline" style="font-size:0.75rem;padding:2px 8px">Modifica</a></td>
+                      </tr>
+                    `;
+                  })
+                  .join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    if (myAdoptedVisits.length > 0) {
+      html += `
+        <div class="aa-card mb-4">
+          <div class="aa-card-header"><i class="bi bi-bookmark-star"></i>Visite Acquistate (${myAdoptedVisits.length})</div>
           <div class="aa-card-body p-0" style="overflow-x:auto;">
             <table class="aa-table">
               <thead>
@@ -953,28 +1008,29 @@ async function caricaMieiContenuti() {
                 </tr>
               </thead>
               <tbody>
-                ${mieVisiteAcquistate
+                ${myAdoptedVisits
                   .map((v) => {
-                    const numTappe = v.tappe?.length || 0;
-                    const stringaStops = `${numTappe} ${numTappe === 1 ? "stop" : "stops"}`;
+                    const stopsCount = (v.stops || v.tappe || []).length;
+                    const title = v.title || v.titolo || "Senza titolo";
+                    const museum = v.museum || v.museo;
                     return `
-                        <tr class="aa-row-clickable-mobile" onclick="if(window.innerWidth < 768) apriVisitaModal('${v._id}')">
-                          <td><strong>${v.titolo || v.title || "Senza titolo"}</strong></td>
-                          <td><small>${v.museo}</small></td>
-                          <td>
-                            <span class="aa-badge aa-badge-len d-none d-md-inline-flex">${stringaStops}</span>
-                            <span class="aa-badge aa-badge-len d-inline-flex d-md-none fw-bold" style="padding: 2px 8px">${numTappe}</span>
-                          </td>
-                          <td class="d-none d-md-table-cell">
-                            <button class="btn-aa-primary" style="font-size:0.75rem; padding:3px 10px; margin-right:5px;" onclick="apriVisitaModal('${v._id}')">
-                              Visualizza
-                            </button>
-                            <a href="/editor-visita?id=${v._id}" class="btn-aa-gold" style="font-size:0.75rem; padding:4px 10px; text-decoration:none;">
-                              Modifica
-                            </a>
-                          </td>
-                        </tr>
-                      `;
+                      <tr class="aa-row-clickable-mobile" onclick="if(window.innerWidth < 768) openVisitModal('${v._id}')">
+                        <td><strong>${title}</strong></td>
+                        <td><small>${museum}</small></td>
+                        <td>
+                          <span class="aa-badge aa-badge-len d-none d-md-inline-flex">${stopsCount}${stopsCount === 1 ? "stop" : "stops"}</span>
+                          <span class="aa-badge aa-badge-len d-inline-flex d-md-none fw-bold" style="padding: 2px 8px">${stopsCount}</span>
+                        </td>
+                        <td class="d-none d-md-table-cell">
+                          <button class="btn-aa-primary" style="font-size:0.75rem; padding:3px 10px; margin-right:5px;" onclick="openVisitModal('${v._id}')">
+                            Visualizza
+                          </button>
+                          <a href="/editor-visita?id=${v._id}" class="btn-aa-gold" style="font-size:0.75rem; padding:4px 10px; text-decoration:none;">
+                            Modifica
+                          </a>
+                        </td>
+                      </tr>
+                    `;
                   })
                   .join("")}
               </tbody>
@@ -984,12 +1040,12 @@ async function caricaMieiContenuti() {
       `;
     }
 
-    container.innerHTML = htmlRisultato;
+    container.innerHTML = html;
   } else {
     if (
-      !mieVisiteAcquistate.length &&
-      !mieiItemsAcquistati.length &&
-      !mieVisiteCreate.length
+      !myAdoptedVisits.length &&
+      !myPurchasedItems.length &&
+      !createdVisitsList.length
     ) {
       container.innerHTML = `
         <div class="aa-empty">
@@ -1000,29 +1056,31 @@ async function caricaMieiContenuti() {
       return;
     }
 
-    let htmlVisitatore = "";
+    let html = "";
 
-    if (mieVisiteCreate.length > 0) {
-      htmlVisitatore += `
+    if (createdVisitsList.length > 0) {
+      html += `
         <div class="aa-card mb-4">
-          <div class="aa-card-header" style="background: var(--aa-primary-pale);"><i class="bi bi-map"></i>Visite Create (${mieVisiteCreate.length})</div>
+          <div class="aa-card-header" style="background: var(--aa-primary-pale);"><i class="bi bi-map"></i>Visite Create (${createdVisitsList.length})</div>
           <div class="aa-card-body p-0" style="overflow-x:auto;">
             <table class="aa-table">
               <thead><tr><th>Titolo Visita</th><th>Museo</th><th>Tappe</th><th>Azioni</th></tr></thead>
               <tbody>
-                ${mieVisiteCreate
+                ${createdVisitsList
                   .map((v) => {
-                    const numTappe = v.tappe?.length || 0;
+                    const stopsCount = (v.stops || v.tappe || []).length;
+                    const title = v.title || v.titolo || "Senza titolo";
+                    const museum = v.museum || v.museo;
                     return `
-                        <tr>
-                          <td><strong>${v.titolo || v.title || "Senza titolo"}</strong></td>
-                          <td><small>${v.museo}</small></td>
-                          <td><span class="aa-badge aa-badge-len">${numTappe} ${numTappe === 1 ? "tappa" : "tappe"}</span></td>
-                          <td>
-                            <a href="/editor-visita?id=${v._id}" class="btn-aa-outline" style="font-size:0.75rem;padding:2px 8px">Modifica</a>
-                          </td>
-                        </tr>
-                      `;
+                      <tr>
+                        <td><strong>${title}</strong></td>
+                        <td><small>${museum}</small></td>
+                        <td><span class="aa-badge aa-badge-len">${stopsCount}${stopsCount === 1 ? "tappa" : "tappe"}</span></td>
+                        <td>
+                          <a href="/editor-visita?id=${v._id}" class="btn-aa-outline" style="font-size:0.75rem;padding:2px 8px">Modifica</a>
+                        </td>
+                      </tr>
+                    `;
                   })
                   .join("")}
               </tbody>
@@ -1032,10 +1090,10 @@ async function caricaMieiContenuti() {
       `;
     }
 
-    if (mieVisiteAcquistate.length > 0) {
-      htmlVisitatore += `
+    if (myAdoptedVisits.length > 0) {
+      html += `
         <div class="aa-card mb-4">
-          <div class="aa-card-header"><i class="bi bi-bookmark-star"></i> Visite Acquistate (${mieVisiteAcquistate.length})</div>
+          <div class="aa-card-header"><i class="bi bi-bookmark-star"></i> Visite Acquistate (${myAdoptedVisits.length})</div>
           <div class="aa-card-body p-0" style="overflow-x:auto;">
             <table class="aa-table">
               <thead>
@@ -1047,25 +1105,26 @@ async function caricaMieiContenuti() {
                 </tr>
               </thead>
               <tbody>
-                ${mieVisiteAcquistate
+                ${myAdoptedVisits
                   .map((v) => {
-                    const numTappe = v.tappe?.length || 0;
-                    const stringaStops = `${numTappe} ${numTappe === 1 ? "stop" : "stops"}`;
+                    const stopsCount = (v.stops || v.tappe || []).length;
+                    const title = v.title || v.titolo || "Senza titolo";
+                    const museum = v.museum || v.museo;
                     return `
-                        <tr class="aa-row-clickable-mobile" onclick="if(window.innerWidth < 768) apriVisitaModal('${v._id}')">
-                          <td><strong>${v.titolo || v.title || "Senza titolo"}</strong></td>
-                          <td><small>${v.museo}</small></td>
-                          <td>
-                            <span class="aa-badge aa-badge-len d-none d-md-inline-flex">${stringaStops}</span>
-                            <span class="aa-badge aa-badge-len d-inline-flex d-md-none fw-bold" style="padding: 2px 8px">${numTappe}</span>
-                          </td>
-                          <td class="d-none d-md-table-cell">
-                            <button class="btn-aa-primary" style="font-size:0.75rem; padding:3px 10px;" onclick="apriVisitaModal('${v._id}')">
-                              Visualizza
-                            </button>
-                          </td>
-                        </tr>
-                      `;
+                      <tr class="aa-row-clickable-mobile" onclick="if(window.innerWidth < 768) openVisitModal('${v._id}')">
+                        <td><strong>${title}</strong></td>
+                        <td><small>${museum}</small></td>
+                        <td>
+                          <span class="aa-badge aa-badge-len d-none d-md-inline-flex">${stopsCount}${stopsCount === 1 ? "stop" : "stops"}</span>
+                          <span class="aa-badge aa-badge-len d-inline-flex d-md-none fw-bold" style="padding: 2px 8px">${stopsCount}</span>
+                        </td>
+                        <td class="d-none d-md-table-cell">
+                          <button class="btn-aa-primary" style="font-size:0.75rem; padding:3px 10px;" onclick="openVisitModal('${v._id}')">
+                            Visualizza
+                          </button>
+                        </td>
+                      </tr>
+                    `;
                   })
                   .join("")}
               </tbody>
@@ -1075,10 +1134,10 @@ async function caricaMieiContenuti() {
       `;
     }
 
-    if (mieiItemsAcquistati.length > 0) {
-      htmlVisitatore += `
+    if (myPurchasedItems.length > 0) {
+      html += `
         <div class="aa-card">
-          <div class="aa-card-header"><i class="bi bi-file-earmark-music"></i> Item Acquistati (${mieiItemsAcquistati.length})</div>
+          <div class="aa-card-header"><i class="bi bi-file-earmark-music"></i> Item Acquistati (${myPurchasedItems.length})</div>
           <div class="aa-card-body p-0" style="overflow-x:auto;">
             <table class="aa-table">
               <thead>
@@ -1090,21 +1149,24 @@ async function caricaMieiContenuti() {
                 </tr>
               </thead>
               <tbody>
-                ${mieiItemsAcquistati
-                  .map(
-                    (item) => `
-                  <tr class="aa-row-clickable-mobile" onclick="if(window.innerWidth < 768) apriItemModal('${item._id}')">
-                    <td><strong>${item.titolo}</strong></td>
-                    <td><small>${item.museo}</small></td>
-                    <td>${badgeLinguaggio(item.linguaggio)}</td>
-                    <td class="d-none d-md-table-cell">
-                      <button class="btn-aa-primary" style="font-size:0.75rem; padding:3px 10px" onclick="apriItemModal('${item._id}')">
-                        Visualizza
-                      </button>
-                    </td>
-                  </tr>
-                `,
-                  )
+                ${myPurchasedItems
+                  .map((item) => {
+                    const title = item.title || item.titolo;
+                    const museum = item.museum || item.museo;
+                    const lang = item.language || item.linguaggio;
+                    return `
+                      <tr class="aa-row-clickable-mobile" onclick="if(window.innerWidth < 768) openItemModal('${item._id}')">
+                        <td><strong>${title}</strong></td>
+                        <td><small>${museum}</small></td>
+                        <td>${badgeLinguaggio(lang)}</td>
+                        <td class="d-none d-md-table-cell">
+                          <button class="btn-aa-primary" style="font-size:0.75rem; padding:3px 10px" onclick="openItemModal('${item._id}')">
+                            Visualizza
+                          </button>
+                        </td>
+                      </tr>
+                    `;
+                  })
                   .join("")}
               </tbody>
             </table>
@@ -1113,116 +1175,107 @@ async function caricaMieiContenuti() {
       `;
     }
 
-    container.innerHTML = htmlVisitatore;
+    container.innerHTML = html;
   }
 }
 
-async function eliminaItem(itemId) {
-  if (!confirm("Eliminare questo item?")) return;
-  const ok = await apiFetch(`/api/items/${itemId}`, { method: "DELETE" });
-  if (ok !== null) {
-    showToast("Item eliminato", "success");
-    caricaMieiContenuti();
-  }
-}
-
-async function apriLogModal() {
+async function openSalesLogModal() {
   document.getElementById("logModal").classList.remove("d-none");
   const body = document.getElementById("logBody");
   body.innerHTML =
     '<div class="text-center py-4"><div class="aa-spinner"></div></div>';
 
-  const u = getUtenteCorrente();
-  if (!u) {
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
+  if (!currentUser) {
     body.innerHTML =
       '<div class="aa-empty"><p>Effettua il login per consultare i log.</p></div>';
     return;
   }
 
-  const [dataItems, dataVisite, dataUtenti] = await Promise.all([
-    apiFetch("/api/items?pubblicato=tutti&limite=500"),
-    apiFetch(`/api/visite?pubblica=tutti&creatorId=${u._id}&limite=500`),
-    apiFetch("/api/utenti"),
+  const [dataItems, dataVisits, dataUsers] = await Promise.all([
+    apiFetch("/api/items?published=all&limit=500"),
+    apiFetch(`/api/visits?isPublic=all&creatorId=${currentUser._id}&limit=500`),
+    apiFetch("/api/users"),
   ]);
 
-  const mappaUtenti = {};
-  if (dataUtenti && Array.isArray(dataUtenti)) {
-    dataUtenti.forEach((user) => {
-      if (user._id) mappaUtenti[String(user._id)] = user.username;
-    });
-  }
+  const usersMap = {};
+  const usersList =
+    dataUsers?.users || (Array.isArray(dataUsers) ? dataUsers : []);
+  usersList.forEach((user) => {
+    if (user._id) usersMap[String(user._id)] = user.username;
+  });
 
   let rows = "";
-  let totaleGuadagnato = 0;
+  let totalEarned = 0;
 
-  if (dataItems && dataItems.items) {
-    dataItems.items.forEach((item) => {
-      const idCreatore = item.creatorId?._id || item.creatorId;
-      if (idCreatore === u._id && Array.isArray(item.logVendite)) {
-        item.logVendite.forEach((log) => {
-          const idAcquirenteObj = log.acquirenteId;
-          const idAcquirenteStr = String(
-            idAcquirenteObj?._id || idAcquirenteObj || "",
-          );
+  const itemsList = dataItems?.items || dataItems?.data?.items || [];
+  itemsList.forEach((item) => {
+    const creatorId = item.creatorId?._id || item.creatorId;
+    const sales = item.salesLogs || item.logVendite || [];
 
-          if (idAcquirenteStr && idAcquirenteStr !== String(u._id)) {
-            const importo = Number(log.prezzo || 0);
-            totaleGuadagnato += importo;
+    if (creatorId === currentUser._id && Array.isArray(sales)) {
+      sales.forEach((log) => {
+        const buyerObj = log.buyerId || log.acquirenteId;
+        const buyerIdStr = String(buyerObj?._id || buyerObj || "");
 
-            const nomeAcquirente =
-              idAcquirenteObj?.username ||
-              mappaUtenti[idAcquirenteStr] ||
-              "Utente Anonimo";
+        if (buyerIdStr && buyerIdStr !== String(currentUser._id)) {
+          const price = Number(log.price ?? log.prezzo ?? 0);
+          totalEarned += price;
 
-            rows += `
-              <tr>
-                <td><span class="aa-badge aa-badge-len"><i class="bi bi-file-earmark-music"></i> Item</span></td>
-                <td><strong>${item.titolo}</strong><br><small class="text-slate">${item.operaId || "–"}</small></td>
-                <td><span class="text-taupe fw-medium">${nomeAcquirente}</span></td>
-                <td><span class="aa-badge ${importo > 0 ? "aa-badge-paid" : "aa-badge-free"}">${importo > 0 ? "Vendita" : "Adozione"}</span></td>
-                <td class="fw-bold text-charcoal">${importo > 0 ? "€ " + importo.toFixed(2) : "Gratis"}</td>
-                <td><small class="text-slate">${log.dataAcquisto ? new Date(log.dataAcquisto).toLocaleDateString("it-IT") : "–"}</small></td>
-              </tr>
-            `;
-          }
-        });
-      }
-    });
-  }
+          const buyerName =
+            buyerObj?.username || usersMap[buyerIdStr] || "Utente Anonimo";
+          const title = item.title || item.titolo;
+          const artworkId = item.artworkId || item.operaId || "–";
+          const purchaseDate = log.purchaseDate || log.dataAcquisto;
 
-  if (dataVisite && dataVisite.visite) {
-    dataVisite.visite.forEach((visita) => {
-      if (Array.isArray(visita.logAdozioni)) {
-        visita.logAdozioni.forEach((log) => {
-          const idAdottanteObj = log.adottanteId;
-          const idAdottanteStr = String(
-            idAdottanteObj?._id || idAdottanteObj || "",
-          );
+          rows += `
+            <tr>
+              <td><span class="aa-badge aa-badge-len"><i class="bi bi-file-earmark-music"></i> Item</span></td>
+              <td><strong>${title}</strong><br><small class="text-slate">${artworkId}</small></td>
+              <td><span class="text-taupe fw-medium">${buyerName}</span></td>
+              <td><span class="aa-badge ${price > 0 ? "aa-badge-paid" : "aa-badge-free"}">${price > 0 ? "Vendita" : "Adozione"}</span></td>
+              <td class="fw-bold text-charcoal">${price > 0 ? "€ " + price.toFixed(2) : "Gratis"}</td>
+              <td><small class="text-slate">${purchaseDate ? new Date(purchaseDate).toLocaleDateString("it-IT") : "–"}</small></td>
+            </tr>
+          `;
+        }
+      });
+    }
+  });
 
-          if (idAdottanteStr && idAdottanteStr !== String(u._id)) {
-            const importo = Number(visita.prezzo || 0);
-            totaleGuadagnato += importo;
+  const visitsList = dataVisits?.visits || dataVisits?.data?.visits || [];
+  visitsList.forEach((visit) => {
+    const adoptions = visit.adoptionLogs || visit.logAdozioni || [];
+    if (Array.isArray(adoptions)) {
+      adoptions.forEach((log) => {
+        const adopterObj = log.adopterId || log.adottanteId;
+        const adopterIdStr = String(adopterObj?._id || adopterObj || "");
 
-            const nomeAcquirente =
-              idAdottanteObj?.username ||
-              mappaUtenti[idAdottanteStr] ||
-              "Utente Anonimo";
+        if (adopterIdStr && adopterIdStr !== String(currentUser._id)) {
+          const price = Number(visit.price ?? visit.prezzo ?? 0);
+          totalEarned += price;
 
-            rows += `
-              <tr>
-                <td><span class="aa-badge aa-badge-paid" style="background:#edf2f7; color:#2b6cb0;"><i class="bi bi-map"></i> Visita</span></td>
-                <td><strong>${visita.titolo || visita.title || "Visita senza nome"}</strong><br><small class="text-slate">${visita.museo}</small></td>
-                <td><span class="text-taupe fw-medium"> ${nomeAcquirente}</span></td>
-                <td><span class="aa-badge ${importo > 0 ? "aa-badge-paid" : "aa-badge-free"}">${importo > 0 ? "Vendita" : "Adozione"}</span></td>
-                <td class="fw-bold text-charcoal">${importo > 0 ? "€ " + importo.toFixed(2) : "Gratis"}</td>
-                <td><small class="text-slate">${log.dataAdozione ? new Date(log.dataAdozione).toLocaleDateString("it-IT") : "–"}</small></td>
-              </tr>
-            `;
-          }
-        });
-      }
-    });
-  }
+          const buyerName =
+            adopterObj?.username || usersMap[adopterIdStr] || "Utente Anonimo";
+          const title = visit.title || visit.titolo || "Visita senza nome";
+          const museum = visit.museum || visit.museo;
+          const adoptionDate = log.adoptedAt || log.dataAdozione;
+
+          rows += `
+            <tr>
+              <td><span class="aa-badge aa-badge-paid" style="background:#edf2f7; color:#2b6cb0;"><i class="bi bi-map"></i> Visita</span></td>
+              <td><strong>${title}</strong><br><small class="text-slate">${museum}</small></td>
+              <td><span class="text-taupe fw-medium">${buyerName}</span></td>
+              <td><span class="aa-badge ${price > 0 ? "aa-badge-paid" : "aa-badge-free"}">${price > 0 ? "Vendita" : "Adozione"}</span></td>
+              <td class="fw-bold text-charcoal">${price > 0 ? "€ " + price.toFixed(2) : "Gratis"}</td>
+              <td><small class="text-slate">${adoptionDate ? new Date(adoptionDate).toLocaleDateString("it-IT") : "–"}</small></td>
+            </tr>
+          `;
+        }
+      });
+    }
+  });
 
   if (!rows) {
     body.innerHTML =
@@ -1234,11 +1287,11 @@ async function apriLogModal() {
     <div class="p-3 mb-3 rounded bg-cream border border-soft d-flex justify-content-between align-items-center">
        <div>
          <span class="aa-label m-0" style="font-size:0.65rem;">Account Monitorato</span>
-         <div class="fw-bold text-charcoal" style="font-size:1.1rem;"> ${u.username}</div>
+         <div class="fw-bold text-charcoal" style="font-size:1.1rem;">${currentUser.username}</div>
        </div>
        <div class="text-end">
          <span class="aa-label m-0" style="font-size:0.65rem;">Totale Incassato</span>
-         <div class="fw-bold text-success" style="font-size:1.25rem;">€ ${totaleGuadagnato.toFixed(2)}</div>
+         <div class="fw-bold text-success" style="font-size:1.25rem;">€ ${totalEarned.toFixed(2)}</div>
        </div>
     </div>
 
@@ -1260,34 +1313,72 @@ async function apriLogModal() {
   `;
 }
 
-function resetFiltri() {
-  stato.filtri = {
-    museo: "",
-    linguaggio: "",
-    categoria: "",
-    prezzo: "",
-    cerca: "",
+function resetFilters() {
+  state.filters = {
+    museum: "",
+    language: "",
+    category: "",
+    price: "",
+    search: "",
   };
-  stato.paginaItems = 1;
-  document.getElementById("campoCerca").value = "";
-  document.querySelectorAll(".aa-filter-btn").forEach((btn, _, arr) => {
-    const gruppo = btn.parentElement;
-    const primo = gruppo.querySelector(".aa-filter-btn");
-    btn.classList.toggle("active", btn === primo);
+  state.itemsPage = 1;
+  const searchInput = document.getElementById("campoCerca");
+  if (searchInput) searchInput.value = "";
+
+  document.querySelectorAll(".aa-filter-btn").forEach((btn) => {
+    const group = btn.parentElement;
+    const first = group.querySelector(".aa-filter-btn");
+    btn.classList.toggle("active", btn === first);
   });
-  caricaItems();
+  loadItems();
 }
 
-function ruotaFrecciaFiltri() {
-  const freccia = document.getElementById("frecciaFiltri");
-  if (!freccia) return;
+function toggleFilterArrow() {
+  const arrow = document.getElementById("frecciaFiltri");
+  if (!arrow) return;
 
   setTimeout(() => {
-    const collapeElement = document.getElementById("collapseFiltri");
-    if (collapeElement && collapeElement.classList.contains("show")) {
-      freccia.style.transform = "rotate(180deg)";
+    const collapseElement = document.getElementById("collapseFiltri");
+    if (collapseElement && collapseElement.classList.contains("show")) {
+      arrow.style.transform = "rotate(180deg)";
     } else {
-      freccia.style.transform = "rotate(0deg)";
+      arrow.style.transform = "rotate(0deg)";
     }
   }, 150);
 }
+
+function renderPagination(containerId, currentPage, totalPages, fetchFuncName) {
+  const container = document.getElementById(containerId);
+  if (!container || totalPages <= 1) {
+    if (container) container.innerHTML = "";
+    return;
+  }
+
+  let html = "";
+  if (currentPage > 1) {
+    html += `<button class="aa-page-btn" onclick="${fetchFuncName}(${currentPage - 1})">‹</button>`;
+  }
+
+  for (let p = 1; p <= totalPages; p++) {
+    html += `<button class="aa-page-btn ${p === currentPage ? "active" : ""}" onclick="${fetchFuncName}(${p})">${p}</button>`;
+  }
+
+  if (currentPage < totalPages) {
+    html += `<button class="aa-page-btn" onclick="${fetchFuncName}(${currentPage + 1})">›</button>`;
+  }
+
+  container.innerHTML = html;
+}
+
+const resetFiltri = resetFilters;
+const ruotaFrecciaFiltri = toggleFilterArrow;
+const apriItemModal = openItemModal;
+const chiudiItemModal = closeItemModal;
+const apriVisitaModal = openVisitModal;
+const chiudiVisitaModal = closeVisitModal;
+const apriLogModal = openSalesLogModal;
+const caricaItems = loadItems;
+const caricaVisiteTab = loadVisitsTab;
+const caricaMieiContenuti = loadMyContent;
+const eseguiAcquistoDnAdozioneItem = handleItemPurchaseOrAdopt;
+const eseguiAcquistoDnAdozioneVisita = handleVisitPurchaseOrAdopt;

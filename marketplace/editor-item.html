@@ -42,7 +42,7 @@
               <a
                 class="nav-link"
                 href="/navigator/"
-                style="color: var(--aa-gold); fw-bold"
+                style="color: var(--aa-gold); font-weight: bold"
                 >Navigator</a
               >
             </li>
@@ -117,9 +117,6 @@
               </div>
 
               <div class="row g-3 mb-3">
-                <div class="col-md-4">
-                  <input type="hidden" id="itemId" value="" />
-                </div>
                 <div class="col-md-4">
                   <input type="hidden" id="itemId" value="" />
                   <input type="hidden" id="operaId" value="" />
@@ -240,9 +237,9 @@
                       <span class="required">*</span></label
                     >
                     <select id="linguaggio" class="aa-select">
-                      <option value="infantile">Infantile</option>
-                      <option value="medio" selected>Medio</option>
-                      <option value="avanzato">Avanzato</option>
+                      <option value="child">Infantile</option>
+                      <option value="medium" selected>Medio</option>
+                      <option value="advanced">Avanzato</option>
                     </select>
                   </div>
                 </div>
@@ -254,7 +251,7 @@
                     <select id="lunghezza" class="aa-select">
                       <option value="3s">3 secondi (Snapshot)</option>
                       <option value="15s">15 secondi (Intro)</option>
-                      <option value="1m">1 minuto (Standard)</option>
+                      <option value="40s">40 secondi (Standard)</option>
                     </select>
                   </div>
                 </div>
@@ -340,11 +337,10 @@
                 >
               </div>
 
-              <input type="hidden" id="itemId" />
               <input type="hidden" id="autoreId" />
               <input type="hidden" id="profonditaContenuto" value="standard" />
 
-              <button class="btn-aa-primary w-100 mb-2" onclick="salvaItem()">
+              <button class="btn-aa-primary w-100 mb-2" onclick="saveItem()">
                 <i class="bi bi-floppy"></i> Salva Item
               </button>
               <button class="btn-aa-outline w-100" onclick="resetForm()">

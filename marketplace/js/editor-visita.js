@@ -1,60 +1,45 @@
-/* ═══════════════════════════════════════════════════
-   editor-visita.js – Logica Editor Visita ArtAround
-   ═══════════════════════════════════════════════════ */
 
-var itemsNelPercorso = itemsNelPercorso || [];
-var tuttiItems = tuttiItems || [];
-var dragSrc = dragSrc || null;
+let stopsInTour = [];
+let allCatalogItems = [];
+let dragSource = null;
+let museumConfig = null;
 
-// ─── INIT ────────────────────────────────────────────
-// ─── INIT ────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
-  // Sincronizza lo stato visivo della navbar globale usando utils.js
-  aggiornaUtenteUI();
+  if (typeof aggiornaUtenteUI === "function") aggiornaUtenteUI();
 
-  configMuseo = await caricaConfigMuseo();
-  const utente = getUtenteCorrente();
+  museumConfig =
+    typeof caricaConfigMuseo === "function" ? await caricaConfigMuseo() : null;
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
 
-  // Se l'utente non ha fatto il login (è un ospite anonimo)
-  // Se l'utente non ha fatto il login (è un ospite anonimo)
-  if (!utente) {
-    // Applichiamo lo sfondo blu scuro direttamente al body
+  if (!currentUser) {
     document.body.style.backgroundColor = "#1e2640";
 
-    // 1. Nascondiamo la navbar globale per liberare la parte superiore dello schermo
     const navbar = document.querySelector(".aa-navbar");
-    if (navbar) {
-      navbar.classList.add("d-none");
-    }
+    if (navbar) navbar.classList.add("d-none");
 
     const mainContainer = document.getElementById("editorMainContainer");
     if (mainContainer) {
-      // 2. Rendiamo visibile il contenitore principale
       mainContainer.classList.remove("d-none");
-
-      // 3. Sostituiamo l'intero layout interno adattando i colori alla palette scura
+      const museumName =
+        museumConfig?.museumName || museumConfig?.museo || "il museo";
       mainContainer.innerHTML = `
         <div class="row justify-content-center align-items-center flex-grow-1" style="min-height: 85vh;">
           <div class="col-md-8 col-lg-6 text-center">
             <div style="font-size: 5rem; margin-bottom: 1rem;">🗺️</div>
-            
             <h2 style="color: var(--aa-gold); font-family: var(--aa-font-serif); font-size: 2.5rem; font-weight: 600;">
               Crea il tuo percorso su misura!
             </h2>
-            
             <p class="lead mt-3" style="color: #ffffff; font-weight: 400;">
-              Vuoi diventare un curatore virtuale e progettare la tua visita museale perfetta per ${configMuseo ? configMuseo.museo : "il museo"}?
+              Vuoi diventare un curatore virtuale e progettare la tua visita museale perfetta per ${museumName}?
             </p>
-            
             <p class="mb-4" style="color: #cbd5e1; font-size: 0.95rem;">
               Devi effettuare l'accesso per poter mescolare i contenuti del catalogo, creare il tuo itinerario e modificarlo quando vuoi.
             </p>
-            
             <div class="d-flex justify-content-center gap-3 mt-2">
               <a href="/dashboard" class="btn-aa-outline" style="color: #f2ede7; border-color: rgba(242, 237, 231, 0.4); background: rgba(255,255,255,0.05);">
                 <i class="bi bi-arrow-left"></i> Torna alla Dashboard
               </a>
-              
               <button class="btn-aa-primary" onclick="apriLogin()" style="background-color: var(--aa-gold); border-color: var(--aa-gold); color: var(--aa-ink); font-weight: 600;">
                 <i class="bi bi-person"></i> Accedi ora
               </button>
@@ -68,105 +53,125 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.body.style.backgroundColor = "var(--aa-cream)";
 
-  if (configMuseo && configMuseo.museo) {
-    const inputMuseo = document.getElementById("visitaMuseo");
-    if (inputMuseo) {
-      inputMuseo.value = configMuseo.museo;
-    }
+  const museumName = museumConfig?.museumName || museumConfig?.museo;
+  if (museumName) {
+    const inputMuseum = document.getElementById("visitaMuseo");
+    if (inputMuseum) inputMuseum.value = museumName;
   }
 
-  await popolaMusei();
-  await caricaAutori();
-  await caricaTuttiItems();
+  await populateMuseums();
+  await loadAuthors();
+  await loadAllCatalogItems();
 
-  applicaRestrizioniVisitatore();
+  applyVisitorRestrictions();
 
   const params = new URLSearchParams(window.location.search);
-  if (params.get("id")) caricaVisitaPerModifica(params.get("id"));
+  if (params.get("id")) loadTourForEdit(params.get("id"));
 
-  document.getElementById("cercaCatalogo")?.addEventListener(
-    "input",
-    debounce((e) => {
-      renderCatalogo(e.target.value.trim().toLowerCase());
-    }, 250),
-  );
+  const searchInput = document.getElementById("cercaCatalogo");
+  if (searchInput) {
+    const debouncedFilter =
+      typeof debounce === "function"
+        ? debounce(
+            (e) => renderCatalog(e.target.value.trim().toLowerCase()),
+            250,
+          )
+        : (e) => renderCatalog(e.target.value.trim().toLowerCase());
+    searchInput.addEventListener("input", debouncedFilter);
+  }
+
   document.getElementById("editorMainContainer")?.classList.remove("d-none");
 });
 
-// ─── CARICA DATI ────────────────────────────────────
-async function popolaMusei() {
-  if (!configMuseo) return;
+async function populateMuseums() {
+  if (!museumConfig) return;
   const sel = document.getElementById("visitaMuseo");
   if (!sel) return;
+
+  const museumName = museumConfig.museumName || museumConfig.museo || "";
   sel.innerHTML = '<option value="">Seleziona museo...</option>';
   const opt = document.createElement("option");
-  opt.value = configMuseo.museo;
-  opt.textContent = configMuseo.museo;
+  opt.value = museumName;
+  opt.textContent = museumName;
   sel.appendChild(opt);
-  sel.value = configMuseo.museo;
+  sel.value = museumName;
 }
 
-async function caricaAutori() {
-  const utenti = await apiFetch("/api/utenti");
+async function loadAuthors() {
+  const usersRes = await apiFetch("/api/users");
+  const usersList =
+    usersRes?.users || (Array.isArray(usersRes) ? usersRes : []);
   const sel = document.getElementById("visitaAutore");
-  if (!utenti || !sel) return;
-  utenti
-    .filter((u) => ["autore", "admin"].includes(u.ruolo))
+  if (!usersList.length || !sel) return;
+
+  usersList
+    .filter((u) => ["author", "autore", "admin"].includes(u.role || u.ruolo))
     .forEach((u) => {
       const opt = document.createElement("option");
       opt.value = u._id;
-      opt.textContent = `${u.username} (${u.ruolo})`;
+      opt.textContent = `${u.username} (${u.role || u.ruolo})`;
       sel.appendChild(opt);
     });
-  const u = getUtenteCorrente();
-  if (u) sel.value = u._id;
+
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
+  if (currentUser) sel.value = currentUser._id;
 }
 
-async function caricaTuttiItems() {
-  if (!configMuseo) return;
+async function loadAllCatalogItems() {
+  const museumName = museumConfig?.museumName || museumConfig?.museo;
+  if (!museumName) return;
+
   const data = await apiFetch(
-    `/api/items?museo=${encodeURIComponent(configMuseo.museo)}&limite=200&pubblicato=true`,
+    `/api/items?museum=${encodeURIComponent(museumName)}&limit=200&published=true`,
   );
-  tuttiItems = data?.items || [];
-  renderCatalogo("");
+  allCatalogItems = data?.items || data?.data?.items || [];
+  renderCatalog("");
 }
 
-// ─── RENDER CATALOGO ─────────────────────────────────
-function renderCatalogo(filtro = "") {
+function renderCatalog(filterText = "") {
   const container = document.getElementById("catalogoItems");
   if (!container) return;
 
-  // 1. Escludi gli item già presenti nel percorso corrente
-  let items = tuttiItems.filter(
-    (item) => !itemsNelPercorso.some((p) => p.itemId === item._id),
+  let items = allCatalogItems.filter(
+    (item) => !stopsInTour.some((stop) => stop.itemId === item._id),
   );
 
-  // 2. APPLICA FILTRO RUOLO: Se visitatore, mostra solo gratis o acquistati
-  const u = getUtenteCorrente();
-  if (u && !["autore", "admin"].includes(u.ruolo)) {
-    const acquistati = u.itemsAcquistati || u.acquistati || [];
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
+  const role = currentUser?.role || currentUser?.ruolo;
+
+  if (currentUser && !["author", "autore", "admin"].includes(role)) {
+    const purchased =
+      currentUser.purchasedItems ||
+      currentUser.itemsAcquistati ||
+      currentUser.acquistati ||
+      [];
 
     items = items.filter((item) => {
-      const prezzoItem = item.prezzo ? parseFloat(item.prezzo) : 0;
-      const isGratis = prezzoItem === 0;
-      const giaAcquistato = acquistati.includes(item._id);
-      return isGratis || giaAcquistato;
+      const price = Number(item.price ?? item.prezzo ?? 0);
+      const isFree = price === 0;
+      const isPurchased = purchased.includes(item._id);
+      return isFree || isPurchased;
     });
   }
 
-  // 3. Applica il filtro di ricerca testuale (se presente)
-  if (filtro) {
-    const query = filtro.toLowerCase().trim();
-    items = items.filter(
-      (i) =>
-        i.titolo.toLowerCase().includes(query) ||
-        (i.titoloOpera && i.titoloOpera.toLowerCase().includes(query)) ||
-        i.operaId.toLowerCase().includes(query) ||
-        (i.tags || []).some((t) => t.toLowerCase().includes(query)),
-    );
+  if (filterText) {
+    const query = filterText.toLowerCase().trim();
+    items = items.filter((i) => {
+      const title = (i.title || i.titolo || "").toLowerCase();
+      const artworkTitle = (i.titoloOpera || "").toLowerCase();
+      const artworkId = (i.artworkId || i.operaId || "").toLowerCase();
+      const tags = (i.tags || []).map((t) => t.toLowerCase());
+      return (
+        title.includes(query) ||
+        artworkTitle.includes(query) ||
+        artworkId.includes(query) ||
+        tags.some((t) => t.includes(query))
+      );
+    });
   }
 
-  // 4. Render HTML dei risultati filtrati
   if (!items.length) {
     container.innerHTML =
       '<div class="aa-empty" style="padding:1rem"><p style="font-size:0.8rem">Nessun item disponibile.</p></div>';
@@ -175,32 +180,36 @@ function renderCatalogo(filtro = "") {
 
   container.innerHTML = items
     .map((item) => {
-      const giàAggiunto = itemsNelPercorso.some((i) => i.itemId === item._id);
-      const subLabel = item.titoloOpera || "Opera";
+      const isAlreadyAdded = stopsInTour.some((s) => s.itemId === item._id);
+      const title = item.title || item.titolo || "Item";
+      const subLabel = item.title || item.titoloOpera || "Opera";
+      const category = item.category || item.categoria || "altro";
+      const language = item.language || item.linguaggio || "medium";
+      const length = item.length || item.lunghezza || "15s";
+
       return `
       <div class="d-flex align-items-center gap-2 p-2 mb-1 rounded"
            style="border:1px solid var(--aa-stone);background:#fff;transition:background 0.15s"
            onmouseover="this.style.background='var(--aa-cream)'" onmouseout="this.style.background='#fff'">
         <div style="width:36px;height:36px;background:var(--aa-cream-dark);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">
-          ${iconaCategoriaPiccola(item.categoria)}
+          ${getSmallCategoryIcon(category)}
         </div>
         <div class="flex-grow-1 min-w-0">
-          <div style="font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--aa-ink);">${item.titolo}</div>
-          
+          <div style="font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--aa-ink);">${title}</div>
           <div style="font-size:0.75rem; color:var(--aa-slate); display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:2px;">
             <span style="font-weight:600; color:var(--aa-charcoal); font-size:0.78rem;">${subLabel}</span>
             <span style="opacity:0.5;">·</span>
-            ${badgeLinguaggio(item.linguaggio)}
+            ${badgeLinguaggio(language)}
             <span style="opacity:0.5;">·</span>
             <span class="badge bg-dark-subtle text-dark-emphasis" style="font-size:0.68rem; font-weight:600; padding:2px 6px; border-radius:4px;">
-              <i class="bi bi-clock me-1"></i>${item.lunghezza}
+              <i class="bi bi-clock me-1"></i>${length}
             </span>
           </div>
         </div>
         <button class="btn-aa-outline" 
-        style="font-size:0.75rem;padding:3px 10px;flex-shrink:0;${giàAggiunto ? "opacity:0.4;cursor:default" : ""}"
-        ${giàAggiunto ? 'disabled title="Già aggiunto"' : `onclick="aggiungiItemAlPercorso('${item._id}')"`}>
-        ${giàAggiunto ? "✓" : "+ Aggiungi"}
+          style="font-size:0.75rem;padding:3px 10px;flex-shrink:0;${isAlreadyAdded ? "opacity:0.4;cursor:default" : ""}"
+          ${isAlreadyAdded ? 'disabled title="Già aggiunto"' : `onclick="addStopToTour('${item._id}')"`}>
+          ${isAlreadyAdded ? "✓" : "+ Aggiungi"}
         </button>
       </div>
     `;
@@ -208,8 +217,8 @@ function renderCatalogo(filtro = "") {
     .join("");
 }
 
-function iconaCategoriaPiccola(cat) {
-  const m = {
+function getSmallCategoryIcon(cat) {
+  const iconMap = {
     pittura: "🖼️",
     scultura: "🗿",
     architettura: "🏛️",
@@ -219,115 +228,119 @@ function iconaCategoriaPiccola(cat) {
     decorativa: "🪆",
     altro: "🔍",
   };
-  return m[cat] || "🔍";
+  return iconMap[cat] || "🔍";
 }
 
-// ─── GESTIONE PERCORSO ───────────────────────────────
-function aggiungiItemAlPercorso(itemId) {
-  salvaTestoLogisticaCorrente(); // Mantiene il testo digitato prima di ridisegnare
+function addStopToTour(itemId) {
+  saveCurrentLogisticsText();
 
-  if (itemsNelPercorso.some((i) => i.itemId === itemId)) {
+  if (stopsInTour.some((s) => s.itemId === itemId)) {
     showToast("Item già presente nel percorso", "info");
     return;
   }
-  const item = tuttiItems.find((i) => i._id === itemId);
+  const item = allCatalogItems.find((i) => i._id === itemId);
   if (!item) return;
 
-  itemsNelPercorso.push({
+  stopsInTour.push({
     itemId: item._id,
-    ordine: itemsNelPercorso.length + 1,
-    opzionale: false,
-    titolo: item.titolo,
-    titoloOpera: item.titoloOpera || item.titolo,
-    lunghezza: item.lunghezza,
-    linguaggio: item.linguaggio,
-    categoria: item.categoria,
-    immagine: item.immagine,
-    logistica: "",
+    order: stopsInTour.length + 1,
+    isOptional: false,
+    title: item.title || item.titolo,
+    artworkTitle: item.title || item.titoloOpera || item.titolo,
+    length: item.length || item.lunghezza || "15s",
+    language: item.language || item.linguaggio || "medium",
+    category: item.category || item.categoria || "altro",
+    image: item.url || item.image || item.immagine || null,
+    logistics: "",
   });
 
-  renderPercorso();
-  renderCatalogo(
+  renderTour();
+  renderCatalog(
     document.getElementById("cercaCatalogo")?.value.toLowerCase() || "",
   );
 }
 
-function rimuoviItemDalPercorso(itemId) {
-  salvaTestoLogisticaCorrente();
-  itemsNelPercorso = itemsNelPercorso.filter((i) => i.itemId !== itemId);
-  ricalcolaOrdini();
-  renderPercorso();
-  renderCatalogo(
+function removeStopFromTour(itemId) {
+  saveCurrentLogisticsText();
+  stopsInTour = stopsInTour.filter((s) => s.itemId !== itemId);
+  recalculateOrders();
+  renderTour();
+  renderCatalog(
     document.getElementById("cercaCatalogo")?.value.toLowerCase() || "",
   );
 }
 
-function toggleOpzionale(itemId) {
-  salvaTestoLogisticaCorrente();
-  const item = itemsNelPercorso.find((i) => i.itemId === itemId);
-  if (item) {
-    item.opzionale = !item.opzionale;
-    renderPercorso();
+function toggleStopOptional(itemId) {
+  saveCurrentLogisticsText();
+  const stop = stopsInTour.find((s) => s.itemId === itemId);
+  if (stop) {
+    stop.isOptional = !stop.isOptional;
+    renderTour();
   }
 }
 
-function ricalcolaOrdini() {
-  itemsNelPercorso.forEach((item, i) => (item.ordine = i + 1));
+function recalculateOrders() {
+  stopsInTour.forEach((stop, i) => (stop.order = i + 1));
 }
 
-// Sincronizza i testi digitati dentro le textarea con lo stato JavaScript prima dei cambi del DOM
-function salvaTestoLogisticaCorrente() {
+function saveCurrentLogisticsText() {
   document.querySelectorAll(".input-logistica-tappa").forEach((el) => {
     const index = parseInt(el.getAttribute("data-index"), 10);
-    if (itemsNelPercorso[index]) {
-      itemsNelPercorso[index].logistica = el.value;
+    if (stopsInTour[index]) {
+      stopsInTour[index].logistics = el.value;
     }
   });
 }
 
-function renderPercorso() {
+function lengthInMinutes(lengthStr = "15s") {
+  if (lengthStr.includes("m")) return parseFloat(lengthStr) || 1;
+  if (lengthStr.includes("s")) return (parseFloat(lengthStr) || 15) / 60;
+  return 1;
+}
+
+function renderTour() {
   const list = document.getElementById("dndList");
   if (!list) return;
 
   document.getElementById("countItems").textContent =
-    `${itemsNelPercorso.length} item selezionati`;
+    `${stopsInTour.length} item selezionati`;
 
-  const durataMin = itemsNelPercorso.reduce(
-    (acc, i) => acc + lunghezzaInMinuti(i.lunghezza),
+  const totalMin = stopsInTour.reduce(
+    (acc, s) => acc + lengthInMinutes(s.length),
     0,
   );
-  const durataEl = document.getElementById("durataCalcolata");
-  if (durataEl) {
-    durataEl.textContent = `Durata: ~${Math.round(durataMin)} min`;
+  const durationEl = document.getElementById("durataCalcolata");
+  if (durationEl) {
+    durationEl.textContent = `Durata: ~${Math.round(totalMin)} min`;
   }
 
-  if (!itemsNelPercorso.length) {
+  if (!stopsInTour.length) {
     list.innerHTML = `<div class="aa-empty" style="padding:1.5rem"><div class="aa-empty-icon" style="font-size:2rem">📭</div><p class="mb-0" style="font-size:0.85rem">Aggiungi item dal catalogo sottostante per creare il percorso.</p></div>`;
     return;
   }
 
-  list.innerHTML = itemsNelPercorso
-    .map((item, index) => {
-      const valoreLogistica = item.logistica || "";
+  list.innerHTML = stopsInTour
+    .map((stop, index) => {
+      const logisticsValue = stop.logistics || "";
 
       return `
-        <div class="aa-dnd-item ${item.opzionale ? "optional-item" : ""}"
+        <div class="aa-dnd-item ${stop.isOptional ? "optional-item" : ""}"
              draggable="true"
-             data-id="${item.itemId}"
+             data-id="${stop.itemId}"
              ondragstart="onDragStart(event)"
              ondragover="onDragOver(event)"
              ondrop="onDrop(event)"
              ondragend="onDragEnd(event)">
           <span class="drag-handle">⠿</span>
-          <span class="item-num">${item.ordine}</span>
+          <span class="item-num">${stop.order}</span>
           <div class="item-info w-100">
-            <div class="item-title" style="font-weight:600; color:var(--aa-ink);">${item.titolo}</div>
+            <div class="item-title" style="font-weight:600; color:var(--aa-ink);">${stop.title}</div>
             <div class="item-meta mt-1 d-flex align-items-center gap-2 flex-wrap">
-              ${badgeLinguaggio(item.linguaggio)}
+              ${badgeLinguaggio(stop.language)}
               <span class="badge bg-dark-subtle text-dark-emphasis" style="font-size:0.68rem; font-weight: 600; padding:2px 6px; border-radius:4px;">
-                <i class="bi bi-clock me-1"></i>${item.lunghezza}
+                <i class="bi bi-clock me-1"></i>${stop.length}
               </span>
-              ${item.opzionale ? '<span class="aa-badge aa-badge-len" style="border-style:dashed">opzionale</span>' : ""}
+              ${stop.isOptional ? '<span class="aa-badge aa-badge-len" style="border-style:dashed">opzionale</span>' : ""}
             </div>
             
             <div class="mt-2 text-start pr-2" style="width: 95%;">
@@ -340,16 +353,16 @@ function renderPercorso() {
                 placeholder="Es: Svolta a sinistra ed entra nella sala successiva..."
                 data-index="${index}"
                 style="font-size:0.75rem; border-radius:4px; line-height:1.3; resize:vertical; background:var(--aa-cream); border: 1px solid var(--aa-stone);"
-              >${valoreLogistica}</textarea>
+              >${logisticsValue}</textarea>
             </div>
-            </div>
+          </div>
           <div class="d-flex gap-1 ms-auto align-self-start mt-1">
             <button class="btn-aa-outline" style="font-size:0.72rem;padding:2px 8px" 
-                    onclick="toggleOpzionale('${item.itemId}')"
-                    title="${item.opzionale ? "Rendi obbligatorio" : "Rendi opzionale"}">
-              ${item.opzionale ? "⟳" : "○"}
+                    onclick="toggleStopOptional('${stop.itemId}')"
+                    title="${stop.isOptional ? "Rendi obbligatorio" : "Rendi opzionale"}">
+              ${stop.isOptional ? "⟳" : "○"}
             </button>
-            <button class="btn-aa-danger" onclick="rimuoviItemDalPercorso('${item.itemId}')">✕</button>
+            <button class="btn-aa-danger" onclick="removeStopFromTour('${stop.itemId}')">✕</button>
           </div>
         </div>
       `;
@@ -357,39 +370,39 @@ function renderPercorso() {
     .join("");
 }
 
-// ─── DRAG & DROP ─────────────────────────────────────
 function onDragStart(e) {
-  salvaTestoLogisticaCorrente(); // Mette in cassaforte i testi scritti prima dello spostamento
-  dragSrc = e.currentTarget;
+  saveCurrentLogisticsText();
+  dragSource = e.currentTarget;
   e.dataTransfer.effectAllowed = "move";
-  e.dataTransfer.setData("text/plain", dragSrc.dataset.id);
-  setTimeout(() => dragSrc.classList.add("dragging"), 0);
+  e.dataTransfer.setData("text/plain", dragSource.dataset.id);
+  setTimeout(() => dragSource.classList.add("dragging"), 0);
 }
 
 function onDragOver(e) {
   e.preventDefault();
   e.dataTransfer.dropEffect = "move";
   const target = e.currentTarget;
-  if (target !== dragSrc) target.style.borderTop = "2px solid var(--aa-gold)";
+  if (target !== dragSource)
+    target.style.borderTop = "2px solid var(--aa-gold)";
 }
 
 function onDrop(e) {
   e.preventDefault();
   const target = e.currentTarget;
   target.style.borderTop = "";
-  if (target === dragSrc) return;
+  if (target === dragSource) return;
 
-  const srcId = dragSrc.dataset.id;
+  const srcId = dragSource.dataset.id;
   const tgtId = target.dataset.id;
-  const srcIdx = itemsNelPercorso.findIndex((i) => i.itemId === srcId);
-  const tgtIdx = itemsNelPercorso.findIndex((i) => i.itemId === tgtId);
+  const srcIdx = stopsInTour.findIndex((s) => s.itemId === srcId);
+  const tgtIdx = stopsInTour.findIndex((s) => s.itemId === tgtId);
 
   if (srcIdx === -1 || tgtIdx === -1) return;
 
-  const [rimosso] = itemsNelPercorso.splice(srcIdx, 1);
-  itemsNelPercorso.splice(tgtIdx, 0, rimosso);
-  ricalcolaOrdini();
-  renderPercorso();
+  const [removed] = stopsInTour.splice(srcIdx, 1);
+  stopsInTour.splice(tgtIdx, 0, removed);
+  recalculateOrders();
+  renderTour();
 }
 
 function onDragEnd(e) {
@@ -399,35 +412,41 @@ function onDragEnd(e) {
     .forEach((el) => (el.style.borderTop = ""));
 }
 
-function buildTappeFromPath(pathItems) {
-  salvaTestoLogisticaCorrente();
-  return pathItems.map((i) => {
+function buildStopsFromPath(pathItems) {
+  saveCurrentLogisticsText();
+  return pathItems.map((s) => {
     const meta =
-      tuttiItems.find((x) => String(x._id) === String(i.itemId)) || {};
+      allCatalogItems.find((x) => String(x._id) === String(s.itemId)) || {};
+    const artworkId = meta.artworkId || meta.operaId || "";
+
     return {
-      ordine: i.ordine,
-      logistica: i.logistica || "",
-      item_default: String(i.itemId),
-      operaId: meta.operaId || "",
-      opzionale: !!i.opzionale,
+      order: s.order,
+      ordine: s.order,
+      logistics: s.logistics || "",
+      logistica: s.logistics || "",
+      defaultItem: String(s.itemId),
+      item_default: String(s.itemId),
+      artworkId: artworkId,
+      operaId: artworkId,
+      isOptional: !!s.isOptional,
+      opzionale: !!s.isOptional,
     };
   });
 }
 
-async function salvaVisita() {
-  const titolo = document.getElementById("visitaTitolo").value.trim();
-  const museo = document.getElementById("visitaMuseo").value;
+async function saveTour() {
+  const title = document.getElementById("visitaTitolo").value.trim();
+  const museum = document.getElementById("visitaMuseo").value;
 
-  // Modificato: Prende l'id dell'utente loggato corrente, così funziona per qualsiasi ruolo (visitatore incluso)
-  const uLoggato = getUtenteCorrente();
-  const autoreId = uLoggato
-    ? uLoggato._id
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
+  const authorId = currentUser
+    ? currentUser._id
     : document.getElementById("visitaAutore").value;
 
-  const desc = document.getElementById("visitaDescrizione").value.trim();
-  const default_image = "/img/default_item_image.jpg";
+  const description = document.getElementById("visitaDescrizione").value.trim();
+  const defaultImage = "/img/default_item_image.jpg";
 
-  // Modificato: Corretto l'ID da visitaTags a visitaTag per allinearsi all'HTML
   const tagEl = document.getElementById("visitaTag");
   const tags =
     tagEl && tagEl.value
@@ -436,59 +455,71 @@ async function salvaVisita() {
           .map((t) => t.trim())
           .filter(Boolean)
       : [];
-  const durata = Number(document.getElementById("visitaDurata").value) || 60;
-  const licenza = document.getElementById("visitaLicenza").value;
-  const prezzo = Number(document.getElementById("visitaPrezzo").value) || 0;
-  const pubblica = document.getElementById("visitaPubblica").checked;
-  const id = document.getElementById("visitaId").value;
-  const livelloBase =
-    document.getElementById("visitaLivelloBase")?.value || "medio";
 
-  if (!titolo || !museo || !autoreId)
+  const durationMinutes =
+    Number(document.getElementById("visitaDurata").value) || 60;
+  const licenseType = document.getElementById("visitaLicenza").value;
+  const price = Number(document.getElementById("visitaPrezzo").value) || 0;
+  const isPublic = document.getElementById("visitaPubblica").checked;
+  const id = document.getElementById("visitaId").value;
+  const baseLevel =
+    document.getElementById("visitaLivelloBase")?.value || "medium";
+
+  if (!title || !museum || !authorId) {
     return showToast("Compila i campi obbligatori (Titolo, Museo)", "error");
-  if (!itemsNelPercorso.length)
+  }
+  if (!stopsInTour.length) {
     return showToast("Aggiungi almeno un item al percorso", "error");
+  }
 
   let thumbnail = document.getElementById("visitaImmagine").value.trim();
 
-  if (!thumbnail && itemsNelPercorso.length > 0) {
-    const primoItem = tuttiItems.find(
-      (i) => i._id === itemsNelPercorso[0].itemId,
+  if (!thumbnail && stopsInTour.length > 0) {
+    const firstItem = allCatalogItems.find(
+      (i) => i._id === stopsInTour[0].itemId,
     );
-    if (primoItem && primoItem.immagine) {
-      thumbnail = primoItem.immagine;
+    if (firstItem && (firstItem.url || firstItem.image || firstItem.immagine)) {
+      thumbnail = firstItem.url || firstItem.image || firstItem.immagine;
     }
   }
 
-  if (!thumbnail) thumbnail = default_image;
+  if (!thumbnail) thumbnail = defaultImage;
 
-  const tappe = buildTappeFromPath(itemsNelPercorso);
+  const stops = buildStopsFromPath(stopsInTour);
 
   const payload = {
-    titolo,
-    title: titolo,
-    museo,
-    descrizione: desc,
+    title,
+    titolo: title,
+    museum,
+    museo: museum,
+    description,
+    descrizione: description,
+    image: thumbnail,
     immagine: thumbnail,
     tags,
-    durataTotaleStimata: durata,
-    livello_base: livelloBase,
-    licenza: { tipo: licenza },
-    prezzo,
-    pubblica,
-    creatorId: autoreId,
-    stops: itemsNelPercorso.length,
-    duration: `${durata} min`,
-    tappe,
+    totalEstimatedDuration: durationMinutes,
+    durataTotaleStimata: durationMinutes,
+    baseLevel,
+    livello_base: baseLevel,
+    license: { type: licenseType },
+    licenza: { tipo: licenseType },
+    price,
+    prezzo: price,
+    isPublic,
+    pubblica: isPublic,
+    creatorId: authorId,
+    stopsCount: stopsInTour.length,
+    stops: stops,
+    tappe: stops,
+    duration: `${durationMinutes} min`,
   };
 
-  const metodo = id ? "PUT" : "POST";
-  const url = id ? `/api/visite/${id}` : "/api/visite";
-
+  const method = id ? "PUT" : "POST";
+  const url = id ? `/api/visits/${id}` : "/api/visits";
   if (id) payload._id = id;
 
   const ok = await apiFetch(url, {
-    method: metodo,
+    method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
@@ -503,126 +534,120 @@ async function salvaVisita() {
     }, 500);
   }
 }
-async function caricaVisitaPerModifica(id) {
-  const v = await apiFetch(`/api/visite/${id}`);
-  if (!v) return;
 
-  const u = getUtenteCorrente();
+async function loadTourForEdit(id) {
+  const response = await apiFetch(`/api/visits/${id}`);
+  const visit = response?.data || response;
+  if (!visit) return;
 
-  // Rileviamo l'id del creatore originale
-  const idCreatoreOriginale = v.creatorId?._id || v.creatorId || "";
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
+  const originalCreatorId = visit.creatorId?._id || visit.creatorId || "";
+  const isOriginalOwner =
+    currentUser && String(originalCreatorId) === String(currentUser._id);
 
-  // VERIFICA DI PROPRIETÀ: L'utente loggato è il vero creatore?
-  const isVeroProprietario = u && String(idCreatoreOriginale) === String(u._id);
+  if (isOriginalOwner) {
+    document.getElementById("visitaId").value = visit._id;
+    const authorField = document.getElementById("visitaAutore");
+    if (authorField) authorField.value = originalCreatorId;
 
-  if (isVeroProprietario) {
-    // CASO A: È l'autore originale. Manteniamo l'ID per fare l'aggiornamento (PUT)
-    document.getElementById("visitaId").value = v._id;
-    const campoAutore = document.getElementById("visitaAutore");
-    if (campoAutore) campoAutore.value = idCreatoreOriginale;
-
-    document.getElementById("visitaTitolo").value = v.titolo || v.title || "";
+    const currentTitle = visit.title || visit.titolo || "";
+    document.getElementById("visitaTitolo").value = currentTitle;
     document.getElementById("editorTitolo").textContent =
-      `Modifica: ${v.titolo || v.title || "Visita"}`;
+      `Modifica: ${currentTitle || "Visita"}`;
     showToast(`La tua visita è stata caricata per la modifica`, "info");
   } else {
-    // CASO B: È un visitatore (o un altro autore che l'ha acquistata)! FORZIAMO IL CLONE (POST)
-    document.getElementById("visitaId").value = ""; // <-- CANCELLIAMO L'ID ORIGINARIO! Così farà una POST
-    const campoAutore = document.getElementById("visitaAutore");
-    if (campoAutore && u) campoAutore.value = u._id; // <-- L'autore diventa l'utente corrente loggato
+    document.getElementById("visitaId").value = "";
+    const authorField = document.getElementById("visitaAutore");
+    if (authorField && currentUser) authorField.value = currentUser._id;
 
-    // Cambiamo il titolo aggiungendo un prefisso per far capire che è un clone personalizzato
-    const nuovoTitolo = `Copia di ${v.titolo || v.title || "Visita"}`;
-    document.getElementById("visitaTitolo").value = nuovoTitolo;
+    const clonedTitle = `Copia di ${visit.title || visit.titolo || "Visita"}`;
+    document.getElementById("visitaTitolo").value = clonedTitle;
     document.getElementById("editorTitolo").textContent =
-      `Personalizza: ${nuovoTitolo}`;
-
+      `Personalizza: ${clonedTitle}`;
     showToast(
       `Guida acquistata: generata una copia autonoma da personalizzare`,
       "success",
     );
   }
 
-  // Popolamento dei campi di testo generali
-  document.getElementById("visitaDescrizione").value = v.descrizione || "";
+  document.getElementById("visitaDescrizione").value =
+    visit.description || visit.descrizione || "";
 
-  // Modificato: Corretto l'ID da visitaTags a visitaTag per evitare il crash del client
   const inputTag = document.getElementById("visitaTag");
-  if (inputTag) {
-    inputTag.value = (v.tags || []).join(", ");
-  }
+  if (inputTag) inputTag.value = (visit.tags || []).join(", ");
 
-  document.getElementById("visitaDurata").value = v.durataTotaleStimata || 60;
-  document.getElementById("visitaImmagine").value = v.immagine || "";
+  document.getElementById("visitaDurata").value =
+    visit.totalEstimatedDuration || visit.durataTotaleStimata || 60;
+  document.getElementById("visitaImmagine").value =
+    visit.image || visit.immagine || "";
 
   if (document.getElementById("visitaLivelloBase")) {
     document.getElementById("visitaLivelloBase").value =
-      v.livello_base || "medio";
+      visit.baseLevel || visit.livello_base || "medium";
   }
 
   document.getElementById("visitaLicenza").value =
-    v.licenza?.tipo || "gratuito";
-  document.getElementById("visitaPrezzo").value = v.prezzo || 0;
-  document.getElementById("visitaPubblica").checked = v.pubblica;
+    visit.license?.type || visit.licenza?.tipo || "gratuito";
+  document.getElementById("visitaPrezzo").value = Number(
+    visit.price ?? visit.prezzo ?? 0,
+  );
+  document.getElementById("visitaPubblica").checked =
+    (visit.isPublic ?? visit.pubblica) || false;
 
-  // Ricostruzione delle tappe inserite nel percorso
-  let rawTappe = Array.isArray(v.tappe) ? v.tappe : [];
-  if (rawTappe.length === 0 && Array.isArray(v.items) && v.items.length > 0) {
-    rawTappe = v.items.map((row) => ({
-      ordine: row.ordine,
-      opzionale: row.opzionale,
-      item_default: row.itemId?._id || row.itemId,
-      logistica: row.logistica || "",
+  let rawStops = Array.isArray(visit.stops)
+    ? visit.stops
+    : Array.isArray(visit.tappe)
+      ? visit.tappe
+      : [];
+  if (
+    rawStops.length === 0 &&
+    Array.isArray(visit.items) &&
+    visit.items.length > 0
+  ) {
+    rawStops = visit.items.map((row) => ({
+      order: row.order ?? row.ordine,
+      isOptional: row.isOptional ?? row.opzionale,
+      defaultItem: row.itemId?._id || row.itemId,
+      logistics: row.logistics || row.logistica || "",
     }));
   }
 
-  itemsNelPercorso = rawTappe.map((t) => {
-    const def = t.item_default;
+  stopsInTour = rawStops.map((stop) => {
+    const def = stop.defaultItem || stop.item_default;
     const itemId =
       def && typeof def === "object" && def._id != null ? def._id : def;
-    const pop = def && typeof def === "object" && def.titolo ? def : null;
+    const pop =
+      def && typeof def === "object" && (def.title || def.titolo) ? def : null;
     const meta =
-      pop || tuttiItems.find((x) => String(x._id) === String(itemId)) || {};
+      pop ||
+      allCatalogItems.find((x) => String(x._id) === String(itemId)) ||
+      {};
 
     return {
       itemId: String(itemId),
-      ordine: t.ordine,
-      opzionale: !!t.opzionale,
-      titolo: meta.titolo || t.titolo || "–",
-      titoloOpera: meta.titoloOpera || meta.titolo || t.titoloOpera || "–",
-      lunghezza: meta.lunghezza || "1m",
-      linguaggio: meta.linguaggio || "medio",
-      categoria: meta.categoria || "altro",
-      immagine: meta.immagine || null,
-      logistica: t.logistica || "",
+      order: stop.order ?? stop.ordine ?? 1,
+      isOptional: !!(stop.isOptional ?? stop.opzionale),
+      title: meta.title || meta.titolo || stop.title || "–",
+      artworkTitle: meta.title || meta.titoloOpera || meta.titolo || "–",
+      length: meta.length || meta.lunghezza || "15s",
+      language: meta.language || meta.linguaggio || "medium",
+      category: meta.category || meta.categoria || "altro",
+      image: meta.url || meta.image || meta.immagine || null,
+      logistics: stop.logistics || stop.logistica || "",
     };
   });
 
-  // Ordina cronologicamente le tappe in base all'indice numerico di percorso
-  itemsNelPercorso.sort(
-    (a, b) => (Number(a.ordine) || 0) - (Number(b.ordine) || 0),
-  );
-  itemsNelPercorso.forEach((row, idx) => {
-    row.ordine = idx + 1;
+  stopsInTour.sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+  stopsInTour.forEach((row, idx) => {
+    row.order = idx + 1;
   });
 
-  // Aggiorna l'interfaccia grafica del percorso e del catalogo laterale
-  renderPercorso();
-  renderCatalogo(
+  renderTour();
+  renderCatalog(
     document.getElementById("cercaCatalogo")?.value.toLowerCase() || "",
   );
-
-  // Riporta la pagina in alto all'inizio del modulo per facilitare la compilazione
   window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-async function eliminaVisita(id) {
-  if (!confirm("Eliminare questa visita?")) return;
-  const ok = await apiFetch(`/api/visite/${id}`, { method: "DELETE" });
-  if (ok !== null) {
-    showToast("Visita eliminata", "success");
-    resetEditor();
-  }
 }
 
 function resetEditor() {
@@ -630,7 +655,6 @@ function resetEditor() {
   document.getElementById("visitaTitolo").value = "";
   document.getElementById("visitaDescrizione").value = "";
 
-  // Modificato: Corretto l'ID da visitaTags a visitaTag per evitare errori
   const inputTag = document.getElementById("visitaTag");
   if (inputTag) inputTag.value = "";
 
@@ -641,41 +665,41 @@ function resetEditor() {
   document.getElementById("editorTitolo").textContent = "Nuova Visita";
   document.getElementById("visitaImmagine").value = "";
 
-  const inputMuseo = document.getElementById("visitaMuseo");
-  if (inputMuseo && configMuseo) {
-    inputMuseo.value = configMuseo.museo;
+  const inputMuseum = document.getElementById("visitaMuseo");
+  const museumName = museumConfig?.museumName || museumConfig?.museo;
+  if (inputMuseum && museumName) {
+    inputMuseum.value = museumName;
   }
 
-  const u = getUtenteCorrente();
-  if (u) {
-    const campoAutore = document.getElementById("visitaAutore");
-    if (campoAutore) campoAutore.value = u._id;
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
+  if (currentUser) {
+    const authorField = document.getElementById("visitaAutore");
+    if (authorField) authorField.value = currentUser._id;
   }
 
-  itemsNelPercorso = [];
-  renderPercorso();
-  renderCatalogo("");
+  stopsInTour = [];
+  renderTour();
+  renderCatalog("");
 }
 
-// ─── GESTIONE PERMESSI EDITOR ────────────────────────
-function applicaRestrizioniVisitatore() {
-  const u = getUtenteCorrente();
-  if (!u) return;
-  if (["autore", "admin"].includes(u.ruolo)) return;
+function applyVisitorRestrictions() {
+  const currentUser =
+    typeof getUtenteCorrente === "function" ? getUtenteCorrente() : null;
+  if (!currentUser) return;
+  const role = currentUser.role || currentUser.ruolo;
+  if (["author", "autore", "admin"].includes(role)) return;
 
-  // Nasconde tutti i blocchi dell'interfaccia contrassegnati per autore
-  document.querySelectorAll(".solo-autore").forEach((elemento) => {
-    elemento.classList.add("d-none");
-  });
+  document
+    .querySelectorAll(".solo-autore")
+    .forEach((el) => el.classList.add("d-none"));
 
-  // Forza i valori di default logici per un percorso personale
-  const prezzoEl = document.getElementById("visitaPrezzo");
-  if (prezzoEl) prezzoEl.value = 0;
+  const priceInput = document.getElementById("visitaPrezzo");
+  if (priceInput) priceInput.value = 0;
 
-  const pubblicaEl = document.getElementById("visitaPubblica");
-  if (pubblicaEl) pubblicaEl.checked = false; // Forza non spuntato per sicurezza
+  const publicCheckbox = document.getElementById("visitaPubblica");
+  if (publicCheckbox) publicCheckbox.checked = false;
 
-  // Aggiunge il badge informativo nell'header
   const header = document.querySelector(".aa-card-header");
   if (header && !document.getElementById("badgeVisitatore")) {
     const badge = document.createElement("span");
@@ -687,14 +711,18 @@ function applicaRestrizioniVisitatore() {
     header.appendChild(badge);
   }
 }
-// Listener in tempo reale per catturare i cambiamenti di testo dentro le logiche logistiche
+
 document.addEventListener("input", (e) => {
   if (e.target.classList.contains("input-logistica-tappa")) {
     const index = parseInt(e.target.getAttribute("data-index"), 10);
-    const testoInserito = e.target.value;
-
-    if (itemsNelPercorso[index]) {
-      itemsNelPercorso[index].logistica = testoInserito;
+    if (stopsInTour[index]) {
+      stopsInTour[index].logistics = e.target.value;
     }
   }
 });
+
+const salvaVisita = saveTour;
+const caricaVisitaPerModifica = loadTourForEdit;
+const aggiungiItemAlPercorso = addStopToTour;
+const rimuoviItemDalPercorso = removeStopFromTour;
+const toggleOpzionale = toggleStopOptional;

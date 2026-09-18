@@ -3,11 +3,9 @@ const router = express.Router();
 const ctrl = require("../controllers/apiController");
 const { requireAuth, requireRole } = require("../middleware/auth");
 
-// Museums
 router.get("/museums", ctrl.getMuseums);
-router.get("/musei", ctrl.getMuseums); // alias retrocompatibilità
+router.get("/musei", ctrl.getMuseums); 
 
-// Items
 router.get("/items", ctrl.getItems);
 router.get("/items/:id", ctrl.getItemById);
 router.post(
@@ -43,7 +41,6 @@ router.patch(
 router.post("/items/:id/purchase", requireAuth, ctrl.purchaseItem);
 router.post("/items/:id/acquista", requireAuth, ctrl.purchaseItem);
 
-// Visits
 router.get("/visits", ctrl.getVisits);
 router.get("/visite", ctrl.getVisits);
 router.get("/visits/:id", ctrl.getVisitById);
@@ -87,7 +84,6 @@ router.delete(
 router.post("/visits/:id/adopt", requireAuth, ctrl.adoptVisit);
 router.post("/visite/:id/adotta", requireAuth, ctrl.adoptVisit);
 
-// Users
 router.get(
   "/users",
   requireAuth,
@@ -103,7 +99,6 @@ router.get(
 router.post("/register", ctrl.registerUser);
 router.post("/login", ctrl.loginUser);
 
-// Stats & Sales Logs
 router.get("/stats", ctrl.getStats);
 router.get(
   "/logs/sales",

@@ -102,7 +102,7 @@
               aria-expanded="false"
               aria-controls="collapseFiltri"
               style="cursor: pointer"
-              onclick="ruotaFrecciaFiltri()"
+              onclick="toggleFilterArrow()"
             >
               <h5
                 class="m-0 text-uppercase tracking-wider"
@@ -147,11 +147,13 @@
                   <button class="aa-filter-btn active" data-lang="">
                     Tutti
                   </button>
-                  <button class="aa-filter-btn" data-lang="infantile">
+                  <button class="aa-filter-btn" data-lang="child">
                     Infantile
                   </button>
-                  <button class="aa-filter-btn" data-lang="medio">Medio</button>
-                  <button class="aa-filter-btn" data-lang="avanzato">
+                  <button class="aa-filter-btn" data-lang="medium">
+                    Medio
+                  </button>
+                  <button class="aa-filter-btn" data-lang="advanced">
                     Avanzato
                   </button>
                 </div>
@@ -227,7 +229,7 @@
 
                 <button
                   class="btn-aa-outline w-100 mb-3"
-                  onclick="resetFiltri()"
+                  onclick="resetFilters()"
                   style="font-size: 0.8rem"
                 >
                   <i class="bi bi-x-circle"></i> Reset
@@ -270,16 +272,10 @@
               id="campoCerca"
               class="aa-input"
               placeholder="Cerca per titolo, artista, tag..."
-              oninput="debounceCerca()"
               style="max-width: 300px"
             />
 
-            <select
-              id="selectLimit"
-              class="aa-select"
-              onchange="cambiaLimite(this.value)"
-              style="width: auto"
-            >
+            <select id="selectLimit" class="aa-select" style="width: auto">
               <option value="12">12 / pag</option>
               <option value="24">24 / pag</option>
               <option value="48">48 / pag</option>
@@ -288,7 +284,7 @@
               <button
                 id="btnLogVendite"
                 class="btn-aa-outline"
-                onclick="apriLogModal()"
+                onclick="openSalesLogModal()"
               >
                 <i class="bi bi-graph-up-arrow"></i> Log Vendite
               </button>
@@ -346,7 +342,7 @@
       <div class="aa-modal" style="max-width: 640px">
         <div class="aa-modal-header">
           <h4 id="modalItemTitolo">–</h4>
-          <button class="aa-modal-close" onclick="chiudiItemModal()">✕</button>
+          <button class="aa-modal-close" onclick="closeItemModal()">✕</button>
         </div>
         <div class="aa-modal-body" id="modalItemBody"></div>
         <div class="aa-modal-footer" id="modalItemFooter"></div>
@@ -357,9 +353,7 @@
       <div class="aa-modal" style="max-width: 700px">
         <div class="aa-modal-header">
           <h4 id="modalVisitaTitolo">–</h4>
-          <button class="aa-modal-close" onclick="chiudiVisitaModal()">
-            ✕
-          </button>
+          <button class="aa-modal-close" onclick="closeVisitModal()">✕</button>
         </div>
         <div class="aa-modal-body" id="modalVisitaBody"></div>
         <div class="aa-modal-footer" id="modalVisitaFooter"></div>
@@ -468,7 +462,7 @@
                     type="radio"
                     name="regRuolo"
                     id="ruoloVisitatore"
-                    value="visitatore"
+                    value="visitor"
                     checked
                     style="cursor: pointer"
                   />
@@ -486,7 +480,7 @@
                     type="radio"
                     name="regRuolo"
                     id="ruoloAutore"
-                    value="autore"
+                    value="author"
                     style="cursor: pointer"
                   />
                   <label

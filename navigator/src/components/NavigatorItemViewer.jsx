@@ -405,7 +405,6 @@ export default function NavigatorItemViewer() {
     };
   }, [isPlaying, currentItem]);
 
-  // ---------- NAVIGAZIONE ----------
   const changeItem = (newIndex) => {
     const v = visitRef.current;
     const stopsList = v?.stops || v?.tappe || [];
@@ -465,7 +464,6 @@ export default function NavigatorItemViewer() {
     handleLogisticsRef.current = handleLogistics;
   });
 
-  // ---------- COMANDI VOCALI ----------
   useEffect(() => {
     if (!recognition) return;
     recognitionRef.current = recognition;
