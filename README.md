@@ -6,43 +6,43 @@ An end-to-end interactive web platform tailored for cultural spaces and museum e
 
 ## Key Architectural Features
 
-- **Adaptive Multi-Level Audio Delivery**: Audio guides dynamically switch across different comprehension tiers (`child`, `medium`, `advanced`) and duration targets (`3s`, `15s`, `40s`) to match visitor preferences[cite: 2, 7, 24].
-- **Fail-Safe Playback Architecture**: Hybrid audio pipeline prioritizing pre-rendered audio files and instantly falling back to Speech Synthesis (via `google-tts-api` and native browser `SpeechSynthesis`) whenever pre-recorded assets are unavailable[cite: 11, 24].
-- **Data Integrity & Non-Destructive Tour Forking**: When a user adopts or purchases a curated visit, the system generates an independent clone linked to their profile, protecting the author's public tour from unintended modifications while granting full customization freedom to the adopter[cite: 1, 24].
-- **Indoor Positioning & Multi-Floor Mapping**: Artworks inherit precise 2D spatial coordinates (`floor`, `mapX`, `mapY`) mapped onto high-resolution SVG/PNG floor plans with interactive markers and automatic floor detection[cite: 2, 11, 24].
-- **Conditional Visibility & RBAC**: Strict role separation between Visitors, Authors, and Administrators enforced via stateless JWT middleware[cite: 1, 9, 24]. Unauthenticated guests only access public, free tours; logged-in accounts unlock personal libraries, custom route builder tools, and sales metrics[cite: 1, 10, 18, 24].
-- **Hands-Free Exploration**: Native Web Speech API integration (`SpeechRecognition`) enabling visitors to request directions, switch artwork variants, pause/resume playback, or locate museum facilities using voice commands[cite: 11, 24].
+- **Adaptive Multi-Level Audio Delivery**: Audio guides dynamically switch across different comprehension tiers (`child`, `medium`, `advanced`) and duration targets (`3s`, `15s`, `40s`) to match visitor preferences.
+- **Fail-Safe Playback Architecture**: Hybrid audio pipeline prioritizing pre-rendered audio files and instantly falling back to Speech Synthesis (via `google-tts-api` and native browser `SpeechSynthesis`) whenever pre-recorded assets are unavailable.
+- **Data Integrity & Non-Destructive Tour Forking**: When a user adopts or purchases a curated visit, the system generates an independent clone linked to their profile, protecting the author's public tour from unintended modifications while granting full customization freedom to the adopter.
+- **Indoor Positioning & Multi-Floor Mapping**: Artworks inherit precise 2D spatial coordinates (`floor`, `mapX`, `mapY`) mapped onto high-resolution SVG/PNG floor plans with interactive markers and automatic floor detection.
+- **Conditional Visibility & RBAC**: Strict role separation between Visitors, Authors, and Administrators enforced via stateless JWT middleware. Unauthenticated guests only access public, free tours; logged-in accounts unlock personal libraries, custom route builder tools, and sales metrics.
+- **Hands-Free Exploration**: Native Web Speech API integration (`SpeechRecognition`) enabling visitors to request directions, switch artwork variants, pause/resume playback, or locate museum facilities using voice commands.
 
 ---
 
 ## Localization & Language Support
 
-The codebase, API schema, database models, controllers, and environment settings are designed in **English**[cite: 1, 2, 4]. The user-facing interface, tour descriptions, and voice synthesis configurations are currently localized in **Italian** (`it-IT`) featuring the Museo Egizio of Turin as the reference institution[cite: 11, 24]. The architecture is ready for multi-language extensions (the underlying TTS engine supports `en-US` and all standard BCP-47 locale tags)[cite: 24].
+The codebase, API schema, database models, controllers, and environment settings are designed in **English**. The user-facing interface, tour descriptions, and voice synthesis configurations are currently localized in **Italian** (`it-IT`) featuring the Museo Egizio of Turin as the reference institution. The architecture is ready for multi-language extensions (the underlying TTS engine supports `en-US` and all standard BCP-47 locale tags).
 
 ---
 
 ## Tech Stack
 
-### Mobile Navigator (`/navigator`)
+### Mobile Navigator (/navigator)
 
-- **Core**: React 18, React DOM, React Router v6[cite: 24]
-- **State Management**: React Context API (`NavigatorContext`)[cite: 24]
-- **UI & Layout**: React-Bootstrap, Bootstrap Icons, FontAwesome SVG Icons, CSS Custom Properties[cite: 24]
-- **Browser APIs**: Web Speech API (`webkitSpeechRecognition`, `SpeechSynthesisUtterance`)[cite: 11, 24]
+- **Core**: React 18, React DOM, React Router v6
+- **State Management**: React Context API (NavigatorContext)
+- **UI & Layout**: React-Bootstrap, Bootstrap Icons, FontAwesome SVG Icons, CSS Custom Properties
+- **Browser APIs**: Web Speech API (webkitSpeechRecognition, SpeechSynthesisUtterance)
 
-### Marketplace & Creator Portal (`/`)
+### Marketplace & Creator Portal (/)
 
-- **Core**: HTML5, Vanilla JavaScript (ES6+ Modules, Fetch API, DOM manipulation)[cite: 24]
-- **Styling**: Bootstrap 5.3.2, Bootstrap Icons 1.11.2, Custom Design Tokens[cite: 24]
-- **Zero Client Bundling**: Delivered directly as high-performance static assets[cite: 24]
+- **Core**: HTML5, Vanilla JavaScript (ES6+ Modules, Fetch API, DOM manipulation)
+- **Styling**: Bootstrap 5.3.2, Bootstrap Icons 1.11.2, Custom Design Tokens
+- **Zero Client Bundling**: Delivered directly as high-performance static assets
 
-### Backend Server (`/api`)
+### Backend Server (/api)
 
-- **Runtime**: Node.js (v18+ / v22) & Express.js[cite: 24]
-- **Database & ODM**: MongoDB with Mongoose[cite: 24]
-- **Security & Auth**: JSON Web Tokens (`jsonwebtoken`), password salting & hashing (`bcryptjs`)[cite: 1, 24]
-- **Media & Audio**: `google-tts-api`, `music-metadata`[cite: 24]
-- **Utilities**: `cors`, `dotenv`[cite: 24]
+- **Runtime**: Node.js (v18+ / v22) & Express.js
+- **Database & ODM**: MongoDB with Mongoose
+- **Security & Auth**: JSON Web Tokens (jsonwebtoken), password salting & hashing (bcryptjs)
+- **Media & Audio**: google-tts-api, music-metadata
+- **Utilities**: cors, dotenv
 
 ---
 
@@ -82,3 +82,95 @@ The codebase, API schema, database models, controllers, and environment settings
 ├── index.js                  # Express application entry point & static asset serving
 └── package.json              # Backend dependencies and startup scripts
 ```
+
+---
+
+## 🚀 Installation & Setup
+
+### Prerequisites
+
+- Node.js: v18.0.0 or higher
+- MongoDB: A running local instance (mongodb://127.0.0.1:27017) or a MongoDB Atlas URI
+- npm or yarn
+
+### 1. Clone & Install Dependencies
+
+Clone the repository and install dependencies for both the root backend and the React navigator:
+
+```bash
+git clone [https://github.com/](https://github.com/)<your-username>/ArtAround.git
+cd ArtAround
+
+# Install server dependencies
+npm install
+
+# Install mobile navigator dependencies
+cd navigator
+npm install
+cd ..
+```
+
+### 2. Environment Configuration
+
+Create a .env file in the root folder:
+
+```env
+PORT=3000
+MONGO_URL=mongodb://127.0.0.1:27017/artaround
+JWT_SECRET=your_jwt_private_secret_key
+```
+
+### 3. Database Seeding
+
+Initialize MongoDB with test items, structured variants, museum tours, and users:
+
+```bash
+node seed.js
+```
+
+### 4. Build & Run
+
+#### Production / Single Server Mode
+
+Build the React application and start the unified Express server:
+
+```bash
+cd navigator
+npm run build
+cd ..
+
+npm start
+```
+
+- Marketplace: http://localhost:3000/
+- Mobile Navigator: http://localhost:3000/navigator
+
+#### Development Mode (Concurrent)
+
+To develop with Hot Module Replacement (HMR) on the mobile client:
+
+- Backend: npm run dev (or node index.js) on port 3000
+- Navigator client: In a separate terminal:
+
+```bash
+cd navigator
+npm run dev
+```
+
+---
+
+## 🔐 Default Test Accounts
+
+Running seed.js sets up test accounts for testing permission workflows:
+
+| Role        | Username | Password    | Privileges                                                          |
+| :---------- | :------- | :---------- | :------------------------------------------------------------------ |
+| **Admin**   | admin    | password123 | Unrestricted catalog management, sales audits, global configuration |
+| **Author**  | author1  | password123 | Creates artworks, publishes tours, monetizes audio variants         |
+| **Visitor** | visitor1 | password123 | Adopts tours, creates personal clones, listens to audio content     |
+
+---
+
+## 📄 License
+
+This project is released under the MIT License.
