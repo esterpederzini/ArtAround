@@ -1,3 +1,5 @@
 node_modules
 .env
 atlas-credentials.env
+dist/
+build/
