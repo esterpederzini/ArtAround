@@ -35,27 +35,32 @@ const NavigatorHome = () => {
         setConfig({ museumName: "ArtAround", appName: "Discover the Art" });
       });
 
-    fetch("/api/visite")
+    fetch("/api/visits")
       .then((res) => res.json())
       .then((json) => {
-        if (json.successo && json.data) {
-          const dataVisite = json.data.visite || json.data;
-          setVisits(Array.isArray(dataVisite) ? dataVisite : []);
+        const isSuccessful = json.success ?? json.successo;
+        if (isSuccessful && json.data) {
+          const list = json.data.visits || json.data.visite || json.data;
+          setVisits(Array.isArray(list) ? list : []);
         }
       })
       .catch((err) => console.error("Errore fetch visite:", err));
   }, []);
 
   const filteredVisits = visits.filter((visita) => {
-    const isPrivata = visita.pubblica === false;
-    if (isPrivata) return false;
+    // Esclude le visite private
+    const isPublic = visita.isPublic ?? visita.pubblica ?? true;
+    if (!isPublic) return false;
 
-    const haPrezzo = visita.prezzo && Number(visita.prezzo) > 0;
-    if (haPrezzo) return false;
+    // Esclude le visite a pagamento
+    const price = Number(visita.price ?? visita.prezzo ?? 0);
+    if (price > 0) return false;
 
     const search = searchTerm.toLowerCase();
-    const idVisita = (visita._id || "").toLowerCase();
-    const titoloVisita = (visita.title || visita.titolo || "").toLowerCase();
+    const idVisita = String(visita._id || "").toLowerCase();
+    const titoloVisita = String(
+      visita.title || visita.titolo || "",
+    ).toLowerCase();
     return idVisita.includes(search) || titoloVisita.includes(search);
   });
 
@@ -95,6 +100,14 @@ const NavigatorHome = () => {
     img.onerror = () => setHeroImageReady(true);
     img.src = url;
   }, [config]);
+
+  const getGuideBadge = (visita) => {
+    if (visita.type) return visita.type;
+    const level = visita.baseLevel || visita.linguaggio;
+    if (level === "child" || level === "infantile") return "KIDS GUIDE";
+    if (level === "advanced" || level === "avanzato") return "EXPERT GUIDE";
+    return "CLASSIC GUIDE";
+  };
 
   return (
     <div
@@ -139,7 +152,7 @@ const NavigatorHome = () => {
                 padding: "4px 12px",
                 whiteSpace: "nowrap",
               }}
-              onClick={() => setIsLoginOpen(true)} 
+              onClick={() => setIsLoginOpen(true)}
             >
               Accedi
             </button>
@@ -156,7 +169,9 @@ const NavigatorHome = () => {
         }}
       >
         <div className="hero-content">
-          <h1 className="hero-title">{config?.museo || "ArtAround"}</h1>
+          <h1 className="hero-title">
+            {config?.museumName || config?.museo || "ArtAround"}
+          </h1>
           <p className="hero-subtitle">
             {config?.motto ||
               "Curated journeys through the finest collections."}
@@ -181,6 +196,11 @@ const NavigatorHome = () => {
           {filteredVisits.length > 0 ? (
             filteredVisits.map((visita) => {
               const visitId = visita._id;
+              const stopsCount =
+                visita.stopsCount ??
+                (Array.isArray(visita.stops) ? visita.stops.length : null) ??
+                (Array.isArray(visita.tappe) ? visita.tappe.length : 0);
+
               return (
                 <div
                   key={visitId}
@@ -190,27 +210,18 @@ const NavigatorHome = () => {
                   <div className="card-img-wrapper">
                     <img
                       src={
-                        visita.immagine ||
                         visita.image ||
+                        visita.immagine ||
                         config?.defaultCardImage ||
                         "/img/default_item_image.jpg"
                       }
                       alt={visita.title}
                     />
-                    <span className="card-badge">
-                      {visita.type
-                        ? visita.type
-                        : visita.linguaggio === "infantile"
-                          ? "KIDS GUIDE"
-                          : visita.linguaggio === "avanzato"
-                            ? "EXPERT GUIDE"
-                            : "CLASSIC GUIDE"}
-                    </span>
+                    <span className="card-badge">{getGuideBadge(visita)}</span>
                   </div>
                   <h3>{visita.title || visita.titolo}</h3>
                   <p>
-                    {visita.duration} • {visita.stops || visita.tappe?.length}{" "}
-                    stops
+                    {visita.duration} • {stopsCount} stops
                   </p>
                 </div>
               );

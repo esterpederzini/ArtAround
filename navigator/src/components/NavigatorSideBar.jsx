@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import "../CSS/NavigatorHome.css"; 
+import "../CSS/NavigatorHome.css";
 
 const NavigatorSideBar = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
@@ -18,7 +18,7 @@ const NavigatorSideBar = ({ isOpen, onClose }) => {
   const userName = isLoggato ? utenteObj?.username || "Utente" : null;
 
   const handleNav = (path) => {
-    onClose(); 
+    onClose();
     if (path === "/marketplace") {
       window.location.replace(window.location.origin + "/");
     } else {

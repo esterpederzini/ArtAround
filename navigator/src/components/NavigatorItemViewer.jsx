@@ -13,6 +13,24 @@ if (recognition) {
   recognition.interimResults = false;
 }
 
+const LANG_TO_API = {
+  infantile: "child",
+  medio: "medium",
+  avanzato: "advanced",
+  child: "child",
+  medium: "medium",
+  advanced: "advanced",
+};
+
+const LANG_TO_UI = {
+  child: "infantile",
+  medium: "medio",
+  advanced: "avanzato",
+  infantile: "infantile",
+  medio: "medio",
+  avanzato: "avanzato",
+};
+
 export default function NavigatorItemViewer() {
   const { id, operaIndex } = useParams();
   const navigate = useNavigate();
@@ -41,17 +59,25 @@ export default function NavigatorItemViewer() {
     "15s": "15s",
     "40s": "40s",
   });
+
   const artworkTitle =
-    currentItem?.titoloOpera || currentItem?.titolo || "Untitled Artwork";
+    currentItem?.title ||
+    currentItem?.titoloOpera ||
+    currentItem?.titolo ||
+    "Untitled Artwork";
 
   const artworkArtist =
+    currentItem?.artist ||
     currentItem?.artista ||
+    currentItem?.tourAuthor ||
     currentItem?.autore_visita ||
     currentItem?.autore ||
     "Unknown Artist";
 
   const displayedDescription =
-    currentItem?.descrizione || "No description available.";
+    currentItem?.description ||
+    currentItem?.descrizione ||
+    "No description available.";
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -150,10 +176,10 @@ export default function NavigatorItemViewer() {
   };
 
   useEffect(() => {
-    if (currentItem?.piano)
-      setSelectedMapFloor(
-        currentItem.piano !== undefined ? String(currentItem.piano) : "0",
-      );
+    const currentFloor = currentItem?.floor ?? currentItem?.piano;
+    if (currentFloor !== undefined) {
+      setSelectedMapFloor(String(currentFloor));
+    }
   }, [currentItem]);
 
   useEffect(() => {
@@ -168,67 +194,79 @@ export default function NavigatorItemViewer() {
       })
       .catch(() => {});
 
-    fetch(`/api/visite/${id}`)
+    fetch(`/api/visits/${id}`)
       .then((res) => res.json())
       .then(async (json) => {
         if (!isMounted) return;
 
         const dataVisita = json.data || json;
+        const stopsList = dataVisita?.stops || dataVisita?.tappe;
 
-        if (dataVisita && dataVisita.tappe) {
+        if (dataVisita && stopsList) {
           setVisit(dataVisita);
-          const tappaCorrente = dataVisita.tappe[safeIndex];
+          const currentStop = stopsList[safeIndex];
 
-          if (tappaCorrente) {
-            const defaultLang = tappaCorrente.linguaggio_default || "medio";
-            const defaultDur = tappaCorrente.lunghezza_default || "15s";
+          if (currentStop) {
+            const defaultLang =
+              currentStop.language ||
+              currentStop.linguaggio_default ||
+              dataVisita.baseLevel ||
+              "medium";
+            const defaultDur =
+              currentStop.length || currentStop.lunghezza_default || "15s";
 
-            if (
-              tappaCorrente.item_default &&
-              typeof tappaCorrente.item_default === "object"
-            ) {
-              setCurrentItem(tappaCorrente.item_default);
-              setLanguageLevel(
-                tappaCorrente.item_default.linguaggio || defaultLang,
-              );
+            const defaultItem =
+              currentStop.defaultItem || currentStop.item_default;
+
+            if (defaultItem && typeof defaultItem === "object") {
+              setCurrentItem(defaultItem);
+              const itemLang =
+                defaultItem.language || defaultItem.linguaggio || defaultLang;
+              setLanguageLevel(LANG_TO_UI[itemLang] || "medio");
               setSelectedDuration(
-                tappaCorrente.item_default.lunghezza || defaultDur,
+                defaultItem.length || defaultItem.lunghezza || defaultDur,
               );
               setLoading(false);
               return;
             }
-            if (
-              tappaCorrente.item_default &&
-              typeof tappaCorrente.item_default === "string"
-            ) {
+
+            if (defaultItem && typeof defaultItem === "string") {
               try {
-                const resItem = await fetch(
-                  `/api/items/${tappaCorrente.item_default}`,
-                );
+                const resItem = await fetch(`/api/items/${defaultItem}`);
                 const itemEstratto = await resItem.json();
-                if (itemEstratto && isMounted) {
-                  setCurrentItem(itemEstratto);
-                  setLanguageLevel(itemEstratto.linguaggio || defaultLang);
-                  setSelectedDuration(itemEstratto.lunghezza || defaultDur);
+                const itemData = itemEstratto.data || itemEstratto;
+                if (itemData && isMounted) {
+                  setCurrentItem(itemData);
+                  const itemLang =
+                    itemData.language || itemData.linguaggio || defaultLang;
+                  setLanguageLevel(LANG_TO_UI[itemLang] || "medio");
+                  setSelectedDuration(
+                    itemData.length || itemData.lunghezza || defaultDur,
+                  );
                   setLoading(false);
                   return;
                 }
               } catch (e) {
                 console.warn(
-                  "Errore fetch diretta item_default, tento fallback via operaId:",
+                  "Errore fetch diretta item, tento fallback via artworkId:",
                   e,
                 );
               }
             }
-            const targetOperaId =
-              tappaCorrente.operaId?.operaId ||
-              tappaCorrente.operaId ||
-              tappaCorrente.item_default?.operaId;
 
-            if (targetOperaId) {
+            const targetArtworkId =
+              currentStop.artworkId?.artworkId ||
+              currentStop.artworkId ||
+              currentStop.operaId?.operaId ||
+              currentStop.operaId ||
+              defaultItem?.artworkId ||
+              defaultItem?.operaId;
+
+            if (targetArtworkId) {
               try {
+                const apiLang = LANG_TO_API[defaultLang] || "medium";
                 const resItem = await fetch(
-                  `/api/items?operaId=${targetOperaId}&linguaggio=${defaultLang}&lunghezza=${defaultDur}`,
+                  `/api/items?artworkId=${targetArtworkId}&language=${apiLang}&length=${defaultDur}`,
                 );
                 const jsonItem = await resItem.json();
                 const arrayItems = jsonItem.data?.items || jsonItem.items || [];
@@ -236,14 +274,17 @@ export default function NavigatorItemViewer() {
                 if (arrayItems.length > 0 && isMounted) {
                   const itemEstratto = arrayItems[0];
                   setCurrentItem(itemEstratto);
-                  setLanguageLevel(itemEstratto.linguaggio || defaultLang);
-                  setSelectedDuration(itemEstratto.lunghezza || defaultDur);
+                  const itemLang =
+                    itemEstratto.language ||
+                    itemEstratto.linguaggio ||
+                    defaultLang;
+                  setLanguageLevel(LANG_TO_UI[itemLang] || "medio");
+                  setSelectedDuration(
+                    itemEstratto.length || itemEstratto.lunghezza || defaultDur,
+                  );
                 }
               } catch (err) {
-                console.error(
-                  "Errore nel recupero dei dettagli dell'item via query:",
-                  err,
-                );
+                console.error("Errore recupero dettagli item via query:", err);
               }
             }
           }
@@ -269,7 +310,7 @@ export default function NavigatorItemViewer() {
     window.speechSynthesis.cancel();
     clearInterval(ttsIntervalRef.current);
 
-    const item_audio = currentItem?.audio || currentItem?.audioUrl;
+    const item_audio = currentItem?.audioUrl || currentItem?.audio;
     if (item_audio) {
       console.log("[AUDIO LOG] Carico nuova sorgente statica:", item_audio);
       audio.src = item_audio;
@@ -296,7 +337,8 @@ export default function NavigatorItemViewer() {
 
   useEffect(() => {
     const audio = audioRef.current;
-    const item_audio = currentItem?.audio || currentItem?.audioUrl;
+    const item_audio = currentItem?.audioUrl || currentItem?.audio;
+    const item_desc = currentItem?.description || currentItem?.descrizione;
 
     if (item_audio) {
       if (isPlaying) {
@@ -306,12 +348,10 @@ export default function NavigatorItemViewer() {
             e,
           );
           window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(
-            currentItem.descrizione,
-          );
+          const utterance = new SpeechSynthesisUtterance(item_desc);
           utterance.lang = "it-IT";
 
-          const parole = currentItem.descrizione.split(/\s+/).length;
+          const parole = (item_desc || "").split(/\s+/).length;
           const durataStimata = (parole / 130) * 60;
           setDuration(durataStimata);
 
@@ -320,18 +360,16 @@ export default function NavigatorItemViewer() {
       } else {
         audio.pause();
       }
-    } else if (currentItem?.descrizione) {
+    } else if (item_desc) {
       if (isPlaying) {
         if (window.speechSynthesis.speaking) {
           window.speechSynthesis.resume();
         } else {
           window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(
-            currentItem.descrizione,
-          );
+          const utterance = new SpeechSynthesisUtterance(item_desc);
           utterance.lang = "it-IT";
 
-          const parole = currentItem.descrizione.split(/\s+/).length;
+          const parole = item_desc.split(/\s+/).length;
           const durataStimata = (parole / 130) * 60;
           setDuration(durataStimata);
 
@@ -348,7 +386,7 @@ export default function NavigatorItemViewer() {
         ttsIntervalRef.current = setInterval(() => {
           if (window.speechSynthesis.speaking) {
             setCurrentTime((prevTime) => {
-              const parole = currentItem.descrizione.split(/\s+/).length;
+              const parole = item_desc.split(/\s+/).length;
               const durataStimata = (parole / 130) * 60;
               return Math.min(prevTime + 0.2, durataStimata);
             });
@@ -365,28 +403,23 @@ export default function NavigatorItemViewer() {
     return () => {
       clearInterval(ttsIntervalRef.current);
     };
-  }, [isPlaying]);
+  }, [isPlaying, currentItem]);
 
   // ---------- NAVIGAZIONE ----------
   const changeItem = (newIndex) => {
     const v = visitRef.current;
-    if (v && newIndex >= 0 && newIndex < v.tappe.length) {
+    const stopsList = v?.stops || v?.tappe || [];
+    if (v && newIndex >= 0 && newIndex < stopsList.length) {
       setIsPlaying(false);
       navigate(`/visit/${id}/${newIndex}`);
     }
   };
 
   const updateContent = async (newLevel, newDuration) => {
-    const operaId = currentItem?.operaId;
+    const artworkId = currentItem?.artworkId || currentItem?.operaId;
 
-    console.log("[DEBUG NAVIGATOR] Richiesta cambio variante in corso:", {
-      operaId_rilevato: operaId,
-      nuovo_livello_richiesto: newLevel,
-      nuova_durata_richiesta: newDuration,
-    });
-
-    if (!operaId) {
-      console.error("[DEBUG NAVIGATOR] Errore: operaId è undefined o nullo.");
+    if (!artworkId) {
+      console.error("[DEBUG NAVIGATOR] Errore: artworkId è undefined o nullo.");
       setLogisticsMsg(
         "Errore: impossibile recuperare l'identificativo dell'opera.",
       );
@@ -398,8 +431,9 @@ export default function NavigatorItemViewer() {
     window.speechSynthesis.cancel();
 
     try {
+      const apiLang = LANG_TO_API[newLevel] || newLevel;
       const res = await fetch(
-        `/api/items?operaId=${operaId}&linguaggio=${newLevel}&lunghezza=${newDuration}`,
+        `/api/items?artworkId=${artworkId}&language=${apiLang}&length=${newDuration}`,
       );
       const json = await res.json();
       const arrayItems = json.data?.items || json.items || [];
@@ -457,7 +491,8 @@ export default function NavigatorItemViewer() {
         cmd.includes("posizione")
       ) {
         setShowMapModal(true);
-        if (item?.piano) setSelectedMapFloor(item.piano);
+        const itemFloor = item?.floor ?? item?.piano;
+        if (itemFloor !== undefined) setSelectedMapFloor(String(itemFloor));
       }
       if (cmd.includes("piu semplice") || cmd.includes("non capisco")) {
         handleSimplify();
@@ -523,22 +558,22 @@ export default function NavigatorItemViewer() {
         cmd.includes("chi e lartista")
       ) {
         handleLogisticsRef.current(
-          `L'autore è ${item?.artista || item?.autore_visita || "sconosciuto"}`,
+          `L'autore è ${item?.artist || item?.artista || item?.tourAuthor || item?.autore_visita || "sconosciuto"}`,
         );
       }
       if (cmd.includes("qual e lo stile")) {
         handleLogisticsRef.current(
-          `Lo stile è: ${item?.stile || "non specificato"}`,
+          `Lo stile è: ${item?.style || item?.stile || "non specificato"}`,
         );
       }
       if (cmd.includes("cosa sto guardando")) {
         handleLogisticsRef.current(
-          `${item?.titolo || "Opera"} — ${item?.categoria || ""}. ${item?.artista ? "Autore: " + item.artista : ""}`,
+          `${item?.title || item?.titolo || "Opera"} — ${item?.category || item?.categoria || ""}. ${item?.artist || item?.artista ? "Autore: " + (item.artist || item.artista) : ""}`,
         );
       }
       if (cmd.includes("periodo") || cmd.includes("quando e stato fatto")) {
         handleLogisticsRef.current(
-          `L'opera risale al periodo: ${item?.periodo || "non specificato"}`,
+          `L'opera risale al periodo: ${item?.period || item?.periodo || "non specificato"}`,
         );
       }
       if (
@@ -594,19 +629,28 @@ export default function NavigatorItemViewer() {
   }
 
   const getLogisticsDirections = () => {
-    if (!visit || !visit.tappe) return "Nessuna indicazione disponibile.";
+    const stopsList = visit?.stops || visit?.tappe;
+    if (!visit || !stopsList) return "Nessuna indicazione disponibile.";
 
-    if (safeIndex >= visit.tappe.length - 1) {
+    if (safeIndex >= stopsList.length - 1) {
+      const lastStop = stopsList[safeIndex];
       return (
-        visit.tappe[safeIndex]?.logistica || "Sei arrivato a destinazione."
+        lastStop?.logistics ||
+        lastStop?.logistica ||
+        "Sei arrivato a destinazione."
       );
     }
 
+    const nextStop = stopsList[safeIndex + 1];
     return (
-      visit.tappe[safeIndex + 1]?.logistica ||
+      nextStop?.logistics ||
+      nextStop?.logistica ||
       "Procedi verso la prossima tappa."
     );
   };
+
+  const totalStopsCount =
+    visit?.stopsCount ?? (visit?.stops || visit?.tappe || []).length;
 
   return (
     <div className="navigator-viewer-layout">
@@ -616,7 +660,7 @@ export default function NavigatorItemViewer() {
         </button>
         <div className="top-nav-center">
           <span className="top-nav-title">
-            {visit?.titolo || visit?.title || "Visita"}
+            {visit?.title || visit?.titolo || "Visita"}
           </span>
         </div>
       </div>
@@ -625,8 +669,8 @@ export default function NavigatorItemViewer() {
         <section className="hero-image-container">
           <img
             src={
-              currentItem?.immagine ||
               currentItem?.url ||
+              currentItem?.immagine ||
               "/img/default_item_image.jpg"
             }
             className="hero-image"
@@ -635,7 +679,7 @@ export default function NavigatorItemViewer() {
           <div className="hero-overlay-gradient"></div>
           <div className="hero-caption">
             <p className="category-label">
-              {currentItem?.categoria || "Opera"}
+              {currentItem?.category || currentItem?.categoria || "Opera"}
             </p>
             <h1 className="hero-title">{artworkTitle}</h1>
             <div className="d-flex flex-wrap gap-2 mt-2">
@@ -803,7 +847,7 @@ export default function NavigatorItemViewer() {
                   <button
                     className="btn-item-skip"
                     onClick={() => {
-                      if (safeIndex === (visit?.tappe?.length ?? 0) - 1) {
+                      if (safeIndex === totalStopsCount - 1) {
                         setShowEndModal(true);
                       } else {
                         changeItem(safeIndex + 1);
@@ -819,7 +863,7 @@ export default function NavigatorItemViewer() {
         </Container>
       </div>
 
-      {/*LOGISTICA */}
+      {/* LOGISTICA */}
       {logisticsMsg && (
         <div className="logistics-toast">
           <i className="bi bi-info-circle-fill me-2"></i>
@@ -832,14 +876,19 @@ export default function NavigatorItemViewer() {
         <button
           className="nav-item"
           onClick={() => {
+            const currentArtworkId =
+              currentItem?.artworkId || currentItem?.operaId;
             const configArtwork =
               museumConfig?.posizione_opere?.find(
-                (o) => String(o.operaId) === String(currentItem?.operaId),
+                (o) =>
+                  String(o.artworkId || o.operaId) === String(currentArtworkId),
               ) || {};
             const realFloor =
-              currentItem?.piano !== undefined
-                ? String(currentItem.piano)
-                : configArtwork.piano || "0";
+              currentItem?.floor !== undefined
+                ? String(currentItem.floor)
+                : currentItem?.piano !== undefined
+                  ? String(currentItem.piano)
+                  : configArtwork.piano || "0";
 
             setSelectedMapFloor(realFloor);
             setShowMapModal(true);
@@ -875,31 +924,34 @@ export default function NavigatorItemViewer() {
         <Modal.Body className="bg-transparent">
           <div className="details-text-container">
             <p>
-              <strong>Titolo:</strong> {currentItem?.titolo || "N/A"}
+              <strong>Titolo:</strong> {artworkTitle}
             </p>
             <p>
-              <strong>Artista:</strong>{" "}
-              {currentItem?.artista ||
-                currentItem?.autore_visita ||
-                currentItem?.autore ||
-                "Ignoto"}
+              <strong>Artista:</strong> {artworkArtist}
             </p>
-            {currentItem?.stile && (
+            {(currentItem?.style || currentItem?.stile) && (
               <p>
-                <strong>Stile / Periodo:</strong> {currentItem.stile}
+                <strong>Stile / Periodo:</strong>{" "}
+                {currentItem.style || currentItem.stile}
               </p>
             )}
             <p>
-              <strong>Posizione:</strong> Piano {currentItem?.piano || "0"}
+              <strong>Posizione:</strong> Piano{" "}
+              {currentItem?.floor ?? currentItem?.piano ?? "0"}
             </p>
             <p>
               <strong>Licenza:</strong>{" "}
-              {currentItem?.licenza?.tipo || currentItem?.licenza || "–"}
+              {currentItem?.license?.type ||
+                currentItem?.licenza?.tipo ||
+                currentItem?.licenza ||
+                "–"}
             </p>
-            {currentItem?.categoria && (
+            {(currentItem?.category || currentItem?.categoria) && (
               <p>
                 <strong>Categoria:</strong>{" "}
-                <span className="text-capitalize">{currentItem.categoria}</span>
+                <span className="text-capitalize">
+                  {currentItem.category || currentItem.categoria}
+                </span>
               </p>
             )}
           </div>
@@ -937,7 +989,7 @@ export default function NavigatorItemViewer() {
               </button>
               <button
                 className="btn-museum-outline flex-fill"
-                disabled={safeIndex === (visit?.tappe?.length ?? 0) - 1}
+                disabled={safeIndex === totalStopsCount - 1}
                 onClick={() => {
                   changeItem(safeIndex + 1);
                   setShowAccessMenu(false);
@@ -1011,9 +1063,7 @@ export default function NavigatorItemViewer() {
               <button
                 className="btn-museum-outline flex-fill"
                 onClick={() => {
-                  handleLogistics(
-                    `L'autore è ${currentItem?.artista || currentItem?.autore_visita || "sconosciuto"}`,
-                  );
+                  handleLogistics(`L'autore è ${artworkArtist}`);
                   setShowAccessMenu(false);
                 }}
               >
@@ -1023,7 +1073,7 @@ export default function NavigatorItemViewer() {
                 className="btn-museum-outline flex-fill"
                 onClick={() => {
                   handleLogistics(
-                    `Lo stile è: ${currentItem?.stile || "non specificato"}`,
+                    `Lo stile è: ${currentItem?.style || currentItem?.stile || "non specificato"}`,
                   );
                   setShowAccessMenu(false);
                 }}
@@ -1035,7 +1085,7 @@ export default function NavigatorItemViewer() {
               className="btn-museum-outline"
               onClick={() => {
                 handleLogistics(
-                  `${currentItem?.titolo || "Opera"} — ${currentItem?.categoria || ""}. ${currentItem?.artista ? "Autore: " + currentItem.artista : ""}`,
+                  `${artworkTitle} — ${currentItem?.category || currentItem?.categoria || ""}. ${artworkArtist ? "Autore: " + artworkArtist : ""}`,
                 );
                 setShowAccessMenu(false);
               }}
@@ -1122,7 +1172,7 @@ export default function NavigatorItemViewer() {
         </Modal.Body>
       </Modal>
 
-      {/* CONFIRMA USCITA */}
+      {/* CONFERMA USCITA */}
       <Modal
         show={showExitModal}
         onHide={() => setShowExitModal(false)}
@@ -1188,13 +1238,14 @@ export default function NavigatorItemViewer() {
             />
             {currentItem &&
               (() => {
-            
                 const currentFloor =
-                  currentItem?.piano !== undefined
-                    ? String(currentItem.piano)
-                    : "0";
-                const mapX = currentItem?.mappa_x;
-                const mapY = currentItem?.mappa_y;
+                  currentItem?.floor !== undefined
+                    ? String(currentItem.floor)
+                    : currentItem?.piano !== undefined
+                      ? String(currentItem.piano)
+                      : "0";
+                const mapX = currentItem?.mapX ?? currentItem?.mappa_x;
+                const mapY = currentItem?.mapY ?? currentItem?.mappa_y;
 
                 if (
                   mapX === undefined ||
@@ -1224,30 +1275,44 @@ export default function NavigatorItemViewer() {
           </div>
 
           <div className="px-3 py-2" style={{ background: "#1a1a1a" }}>
-            {visit?.tappe?.map((tappa, idx) => {
-              const dbItem = tappa.item_default;
-              const rowOperaId =
-                tappa.operaId?.operaId || tappa.operaId || dbItem?.operaId;
+            {(visit?.stops || visit?.tappe || []).map((tappa, idx) => {
+              const dbItem = tappa.defaultItem || tappa.item_default;
+              const rowArtworkId =
+                tappa.artworkId?.artworkId ||
+                tappa.artworkId ||
+                tappa.operaId?.operaId ||
+                tappa.operaId ||
+                dbItem?.artworkId ||
+                dbItem?.operaId;
 
               const configArtwork =
                 museumConfig?.posizione_opere?.find(
-                  (o) => String(o.operaId) === String(rowOperaId),
+                  (o) =>
+                    String(o.artworkId || o.operaId) === String(rowArtworkId),
                 ) || {};
+
               const rowFloor =
-                dbItem?.piano !== undefined
-                  ? String(dbItem.piano)
-                  : configArtwork.piano || "0";
+                dbItem?.floor !== undefined
+                  ? String(dbItem.floor)
+                  : dbItem?.piano !== undefined
+                    ? String(dbItem.piano)
+                    : configArtwork.piano || "0";
+
               const rowTitle =
+                dbItem?.title ||
                 dbItem?.titoloOpera ||
                 dbItem?.titolo ||
                 configArtwork.titoloOpera ||
                 `Tappa ${idx + 1}`;
 
               if (String(rowFloor) !== String(selectedMapFloor)) return null;
+
+              const currentArtworkId =
+                currentItem?.artworkId || currentItem?.operaId;
               const isCurrent =
                 currentItem &&
-                rowOperaId &&
-                String(rowOperaId) === String(currentItem.operaId);
+                rowArtworkId &&
+                String(rowArtworkId) === String(currentArtworkId);
 
               return (
                 <div
@@ -1353,6 +1418,7 @@ export default function NavigatorItemViewer() {
         </Modal.Body>
       </Modal>
 
+      {/* MODAL FINE VISITA */}
       <Modal
         show={showEndModal}
         onHide={() => setShowEndModal(false)}
@@ -1368,7 +1434,7 @@ export default function NavigatorItemViewer() {
           <p className="museum-modal-content-overview">
             Hai concluso{" "}
             <strong style={{ color: "#e18f37" }}>
-              {visit?.titolo || visit?.title || "questa visita"}
+              {visit?.title || visit?.titolo || "questa visita"}
             </strong>
             . Grazie per aver esplorato con noi.
           </p>

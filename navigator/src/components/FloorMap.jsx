@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 export default function FloorMap({ config, currentItem }) {
   const navigate = useNavigate();
+
   const handleMapClick = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
@@ -11,11 +12,22 @@ export default function FloorMap({ config, currentItem }) {
   };
 
   const currentFloor =
-    currentItem?.piano !== undefined ? String(currentItem.piano) : "0";
+    currentItem?.floor !== undefined
+      ? String(currentItem.floor)
+      : currentItem?.piano !== undefined
+        ? String(currentItem.piano)
+        : "0";
+
   const urlMappa = config?.mappe?.[currentFloor];
 
-  const mapX = currentItem?.mappa_x;
-  const mapY = currentItem?.mappa_y;
+  const mapX = currentItem?.mapX ?? currentItem?.mappa_x;
+  const mapY = currentItem?.mapY ?? currentItem?.mappa_y;
+
+  const artworkTitle =
+    currentItem?.title ||
+    currentItem?.titoloOpera ||
+    currentItem?.titolo ||
+    "Opera";
 
   return (
     <div
@@ -27,8 +39,7 @@ export default function FloorMap({ config, currentItem }) {
           Indietro
         </Button>
         <h5 className="mt-3">
-          Posizione: {currentItem?.titoloOpera || currentItem?.titolo} (Piano{" "}
-          {currentFloor})
+          Posizione: {artworkTitle} (Piano {currentFloor})
         </h5>
       </div>
 

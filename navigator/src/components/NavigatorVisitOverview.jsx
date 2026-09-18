@@ -17,7 +17,7 @@ function NavigatorVisitOverview() {
   const navigate = useNavigate();
 
   const [visit, setVisit] = useState(null);
-  const [allItems, setAllItems] = useState([]); 
+  const [allItems, setAllItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showExitModal, setShowExitModal] = useState(false);
 
@@ -25,10 +25,10 @@ function NavigatorVisitOverview() {
 
   useEffect(() => {
     if (!id) return;
-    const key = `artaround_furthest_${id}`;
-    const stored = localStorage.getItem(key);
-    if (stored !== null) {
-      setFurthestIndex(parseInt(stored));
+    const storageKey = `artaround_furthest_${id}`;
+    const storedIndex = localStorage.getItem(storageKey);
+    if (storedIndex !== null) {
+      setFurthestIndex(parseInt(storedIndex, 10));
     }
   }, [id]);
 
@@ -36,26 +36,30 @@ function NavigatorVisitOverview() {
     let isMounted = true;
     setLoading(true);
 
-    fetch("/api/items?limite=200")
+    fetch("/api/items?limit=200")
       .then((res) => res.json())
       .then((itemsJson) => {
-        if (isMounted && itemsJson.successo && itemsJson.data?.items) {
+        const isSuccessful = itemsJson.success ?? itemsJson.successo;
+        if (isMounted && isSuccessful && itemsJson.data?.items) {
           setAllItems(itemsJson.data.items);
         }
       })
-      .catch((err) => console.error("Errore recupero catalogo fallback:", err));
+      .catch((err) =>
+        console.error("Error fetching fallback catalog items:", err),
+      );
 
-    fetch(`/api/visite/${id}`)
+    fetch(`/api/visits/${id}`)
       .then((res) => res.json())
       .then((json) => {
         if (!isMounted) return;
-        if (json.successo && json.data) {
+        const isSuccessful = json.success ?? json.successo;
+        if (isSuccessful && json.data) {
           setVisit(json.data);
         }
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Errore fetch dal DB:", err);
+        console.error("Error fetching visit details:", err);
         if (isMounted) setLoading(false);
       });
 
@@ -64,12 +68,12 @@ function NavigatorVisitOverview() {
     };
   }, [id]);
 
-  const handleShow = () => setShowExitModal(true);
-  const handleClose = () => setShowExitModal(false);
+  const handleShowExitModal = () => setShowExitModal(true);
+  const handleCloseExitModal = () => setShowExitModal(false);
   const handleConfirmExit = () => {
     if (id) {
-      const key = `artaround_furthest_${id}`;
-      localStorage.removeItem(key);
+      const storageKey = `artaround_furthest_${id}`;
+      localStorage.removeItem(storageKey);
     }
     setFurthestIndex(-1);
     setTimeout(() => {
@@ -94,8 +98,10 @@ function NavigatorVisitOverview() {
   }
 
   if (!visit) {
-    return <div className="text-white p-5">Visita non trovato.</div>;
+    return <div className="text-white p-5">Visita non trovata.</div>;
   }
+
+  const stopsList = visit.stops || visit.tappe || [];
 
   return (
     <>
@@ -107,7 +113,7 @@ function NavigatorVisitOverview() {
           <Button
             variant="link"
             className="p-0 shadow-none"
-            onClick={handleShow}
+            onClick={handleShowExitModal}
           >
             <i
               className="bi bi-arrow-left"
@@ -120,7 +126,7 @@ function NavigatorVisitOverview() {
             className="fw-bold"
             style={{ fontSize: "1.2rem", color: "#FAF7F1" }}
           >
-            Tour preview
+            Anteprima Tour
           </span>
         </div>
       </Navbar>
@@ -131,14 +137,16 @@ function NavigatorVisitOverview() {
             <h3 className="text-white fw-bold">
               {visit.title || visit.titolo}
             </h3>
-            <p className="text-secondary small">{visit.museo}</p>
+            <p className="text-secondary small">
+              {visit.museum || visit.museo}
+            </p>
           </div>
 
           <div className="mb-4 btn-container-desktop">
             <Button
               className="start-visit-btn d-flex align-items-center justify-content-center gap-3 w-100"
               onClick={handleStartOrResume}
-              disabled={!(visit.tappe && visit.tappe.length)}
+              disabled={stopsList.length === 0}
             >
               <div className="play-icon-circle">
                 <i className="bi bi-play-fill"></i>
@@ -149,114 +157,127 @@ function NavigatorVisitOverview() {
             </Button>
           </div>
 
-          {!(visit.tappe && visit.tappe.length) ? (
+          {stopsList.length === 0 ? (
             <p className="text-secondary small px-1">
-              Nessuna tappa in questa visita. Controlla che sia stata salvata
-              dal marketplace con il percorso (<code>tappe</code>).
+              Nessuna tappa configurata per questo percorso.
             </p>
           ) : null}
 
-          {visit.tappe &&
-            visit.tappe.map((tappa, index) => {
-              let opera = {};
-              if (
-                tappa.item_default &&
-                typeof tappa.item_default === "object"
-              ) {
-                opera = tappa.item_default;
-              } else {
-                const matchCatalogo = allItems.find(
-                  (item) =>
-                    item.operaId === tappa.operaId &&
-                    item.linguaggio === (tappa.linguaggio_default || "medio"),
-                );
-                opera =
-                  matchCatalogo ||
-                  allItems.find((item) => item.operaId === tappa.operaId) ||
-                  {};
-              }
+          {stopsList.map((stop, index) => {
+            let item = {};
+            const defaultItem = stop.defaultItem || stop.item_default;
+            const currentArtworkId =
+              stop.artworkId ||
+              stop.operaId ||
+              defaultItem?.artworkId ||
+              defaultItem?.operaId;
 
-              const isReached = index <= furthestIndex;
-              const isFurthest = index === furthestIndex;
-
-              const titoloOpera =
-                tappa.item_default?.titolo ||
-                opera.titolo ||
-                `Tappa dell'opera ${tappa.operaId || index + 1}`;
-
-              const urlImmagine =
-                tappa.item_default?.immagine ||
-                tappa.item_default?.url ||
-                opera.immagine ||
-                opera.url ||
-                "/img/default_item_image.jpg"; 
-
-              const stringaDurata = opera.durata_reale
-                ? `${opera.durata_reale}s`
-                : opera.lunghezza || "15s";
-              return (
-                <Row
-                  key={index}
-                  className="g-0 mb-0 itinerary-row"
-                  onClick={() => navigate(`/visit/${id}/${index}`)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <Col
-                    xs={2}
-                    sm={1}
-                    className="d-flex flex-column align-items-center position-relative"
-                  >
-                    <div
-                      className={`list-num-circle ${isReached ? "active" : ""} ${isFurthest ? "furthest" : ""}`}
-                    >
-                      {index < furthestIndex ? (
-                        <i
-                          className="bi bi-check-lg"
-                          style={{ fontSize: "0.9rem" }}
-                        ></i>
-                      ) : (
-                        index + 1
-                      )}
-                    </div>
-                    {index < visit.tappe.length - 1 && (
-                      <div
-                        className={`timeline-line ${isReached ? "reached" : ""}`}
-                      ></div>
-                    )}
-                  </Col>
-
-                  <Col xs={10} sm={11} className="pb-4">
-                    <Card className="itinerary-card shadow-none">
-                      <Row className="g-0 align-items-center">
-                        <Col xs={4} sm={3} md={2} className="p-2">
-                          <Card.Img
-                            src={urlImmagine}
-                            className="img-list-new"
-                          />
-                        </Col>
-                        <Col xs={8} sm={9} md={10}>
-                          <Card.Body className="py-2 px-3">
-                            <Card.Title className="opera-title">
-                              {titoloOpera}
-                            </Card.Title>
-                            <div className="audio-info mt-2">
-                              <i className="bi bi-headphones me-2"></i>
-                              <span>{stringaDurata}</span>
-                            </div>
-                          </Card.Body>
-                        </Col>
-                      </Row>
-                    </Card>
-                  </Col>
-                </Row>
+            if (defaultItem && typeof defaultItem === "object") {
+              item = defaultItem;
+            } else {
+              const targetLang =
+                stop.language || stop.linguaggio_default || "medium";
+              const catalogMatch = allItems.find(
+                (entry) =>
+                  (entry.artworkId === currentArtworkId ||
+                    entry.operaId === currentArtworkId) &&
+                  (entry.language === targetLang ||
+                    entry.linguaggio === targetLang),
               );
-            })}
+              item =
+                catalogMatch ||
+                allItems.find(
+                  (entry) =>
+                    entry.artworkId === currentArtworkId ||
+                    entry.operaId === currentArtworkId,
+                ) ||
+                {};
+            }
+
+            const isReached = index <= furthestIndex;
+            const isFurthest = index === furthestIndex;
+
+            const artworkTitle =
+              defaultItem?.title ||
+              defaultItem?.titoloOpera ||
+              defaultItem?.titolo ||
+              item.title ||
+              item.titoloOpera ||
+              item.titolo ||
+              `Tappa dell'opera ${currentArtworkId || index + 1}`;
+
+            const imageUrl =
+              defaultItem?.url ||
+              defaultItem?.immagine ||
+              item.url ||
+              item.immagine ||
+              "/img/default_item_image.jpg";
+
+            const durationLabel =
+              item.realDuration || item.durata_reale
+                ? `${item.realDuration || item.durata_reale}s`
+                : item.length || item.lunghezza || "15s";
+
+            return (
+              <Row
+                key={index}
+                className="g-0 mb-0 itinerary-row"
+                onClick={() => navigate(`/visit/${id}/${index}`)}
+                style={{ cursor: "pointer" }}
+              >
+                <Col
+                  xs={2}
+                  sm={1}
+                  className="d-flex flex-column align-items-center position-relative"
+                >
+                  <div
+                    className={`list-num-circle ${isReached ? "active" : ""} ${isFurthest ? "furthest" : ""}`}
+                  >
+                    {index < furthestIndex ? (
+                      <i
+                        className="bi bi-check-lg"
+                        style={{ fontSize: "0.9rem" }}
+                      ></i>
+                    ) : (
+                      index + 1
+                    )}
+                  </div>
+                  {index < stopsList.length - 1 && (
+                    <div
+                      className={`timeline-line ${isReached ? "reached" : ""}`}
+                    ></div>
+                  )}
+                </Col>
+
+                <Col xs={10} sm={11} className="pb-4">
+                  <Card className="itinerary-card shadow-none">
+                    <Row className="g-0 align-items-center">
+                      <Col xs={4} sm={3} md={2} className="p-2">
+                        <Card.Img src={imageUrl} className="img-list-new" />
+                      </Col>
+                      <Col xs={8} sm={9} md={10}>
+                        <Card.Body className="py-2 px-3">
+                          <Card.Title className="opera-title">
+                            {artworkTitle}
+                          </Card.Title>
+                          <div className="audio-info mt-2">
+                            <i className="bi bi-headphones me-2"></i>
+                            <span>{durationLabel}</span>
+                          </div>
+                        </Card.Body>
+                      </Col>
+                    </Row>
+                  </Card>
+                </Col>
+              </Row>
+            );
+          })}
         </div>
       </Container>
 
       <Modal
         show={showExitModal}
-        onHide={handleClose}
+        onHide={handleCloseExitModal}
         centered
         className="museum-modal-overview"
         dialogClassName="museum-modal-overview"
@@ -276,7 +297,10 @@ function NavigatorVisitOverview() {
             >
               Esci dalla visita
             </button>
-            <button className="btn-overview-cancel" onClick={handleClose}>
+            <button
+              className="btn-overview-cancel"
+              onClick={handleCloseExitModal}
+            >
               Annulla
             </button>
           </div>

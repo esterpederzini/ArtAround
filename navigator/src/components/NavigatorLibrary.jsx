@@ -12,71 +12,82 @@ const NavigatorLibrary = () => {
   const token =
     localStorage.getItem("aa_token") ||
     JSON.parse(localStorage.getItem("user_session") || "{}")?.token;
-  const utenteRaw = localStorage.getItem("aa_utente");
-  const utenteObj = utenteRaw
-    ? JSON.parse(utenteRaw)
+
+  const rawUser =
+    localStorage.getItem("aa_user") || localStorage.getItem("aa_utente");
+  const currentUser = rawUser
+    ? JSON.parse(rawUser)
     : JSON.parse(localStorage.getItem("user_session") || "{}")?.user;
 
-  const isLoggato = !!token;
-  const userName = isLoggato ? utenteObj?.username || "Utente" : null;
-  const utenteStabileId =
-    utenteObj?.username || utenteObj?._id || utenteObj?.id || "";
+  const isLoggedIn = !!token;
+  const stableUserId =
+    currentUser?.username || currentUser?._id || currentUser?.id || "";
 
   useEffect(() => {
     fetch("/api/config")
       .then((res) => res.json())
       .then((data) => setConfig(data))
       .catch((err) => console.warn("Config non trovato:", err));
-    if (isLoggato && utenteStabileId) {
-      fetch("/api/visite?soloMie=true&limite=100")
+
+    if (isLoggedIn && stableUserId) {
+      fetch("/api/visits?myVisits=true&limit=100")
         .then((res) => res.json())
         .then((json) => {
-          const tutteLeVisite =
-            json.visite ||
-            (json.successo && json.data?.visite) ||
-            (json.successo && json.data) ||
+          const isSuccessful = json.success ?? json.successo;
+          const visitsList =
+            json.visits ||
+            (isSuccessful && json.data?.visits) ||
+            (isSuccessful && json.data?.visite) ||
+            (isSuccessful && json.data) ||
             [];
 
-          if (Array.isArray(tutteLeVisite)) {
-            const mieVisiteFiltrate = tutteLeVisite.filter((visita) => {
-              const autoreId =
-                visita.autore ||
-                visita.userId ||
-                visita.creatorId?._id ||
-                visita.creatorId;
-              const eCreatore =
-                utenteObj &&
-                (autoreId === utenteObj.username ||
-                  autoreId === utenteObj._id ||
-                  autoreId === utenteObj.id);
-              const eAdottataOAcquistata =
-                Array.isArray(visita.logAdozioni) &&
-                visita.logAdozioni.some((log) => {
-                  const idAdottante =
-                    log.adottanteId?._id || log.adottanteId || log.utenteId;
-                  return utenteObj && idAdottante === utenteObj._id;
+          if (Array.isArray(visitsList)) {
+            const filteredVisits = visitsList.filter((visit) => {
+              const authorId =
+                visit.creatorId?._id ||
+                visit.creatorId ||
+                visit.author ||
+                visit.autore ||
+                visit.userId;
+
+              const isCreator =
+                currentUser &&
+                (authorId === currentUser.username ||
+                  authorId === currentUser._id ||
+                  authorId === currentUser.id);
+
+              const adoptionList = visit.adoptionLogs || visit.logAdozioni;
+              const isAdoptedOrPurchased =
+                Array.isArray(adoptionList) &&
+                adoptionList.some((log) => {
+                  const adopterId =
+                    log.adopterId?._id ||
+                    log.adopterId ||
+                    log.adottanteId?._id ||
+                    log.adottanteId ||
+                    log.userId ||
+                    log.utenteId;
+                  return currentUser && adopterId === currentUser._id;
                 });
 
-             
-              if (
-                visita.pubblica === false &&
-                !eCreatore &&
-                !eAdottataOAcquistata
-              ) {
+              const isPublic = visit.isPublic ?? visit.pubblica ?? true;
+
+              if (!isPublic && !isCreator && !isAdoptedOrPurchased) {
                 return false;
               }
 
-              return eAdottataOAcquistata || eCreatore;
+              return isAdoptedOrPurchased || isCreator;
             });
 
-            setMyVisits(mieVisiteFiltrate);
+            setMyVisits(filteredVisits);
           }
         })
         .catch((err) => {
-          console.error("Errore fetch visite in libreria:", err);
+          console.error("Error fetching library visits:", err);
         });
     }
-  }, [isLoggato, utenteStabileId]);
+  }, [isLoggedIn, stableUserId]);
+
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
   const closeSidebar = () => setSidebarOpen(false);
 
@@ -87,13 +98,6 @@ const NavigatorLibrary = () => {
     } else {
       navigate(path);
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("user_session");
-    localStorage.removeItem("aa_token");
-    localStorage.removeItem("aa_utente");
-    navigate("/");
   };
 
   return (
@@ -124,7 +128,7 @@ const NavigatorLibrary = () => {
         className="visits-section"
         style={{ paddingTop: "2rem", minHeight: "60vh" }}
       >
-        {isLoggato ? (
+        {isLoggedIn ? (
           <>
             <div className="section-header mb-4">
               <p className="text-white text-start px-1">
@@ -135,10 +139,13 @@ const NavigatorLibrary = () => {
 
             <div className="horizontal-scroll">
               {myVisits.length > 0 ? (
-                myVisits.map((visita) => {
-                  const visitId = visita._id;
-                  const numStops = Number(
-                    visita.stops || visita.tappe?.length || 0,
+                myVisits.map((visit) => {
+                  const visitId = visit._id;
+                  const stopsCount = Number(
+                    visit.stopsCount ||
+                      visit.stops?.length ||
+                      visit.tappe?.length ||
+                      0,
                   );
 
                   return (
@@ -150,19 +157,19 @@ const NavigatorLibrary = () => {
                       <div className="card-img-wrapper">
                         <img
                           src={
-                            visita.immagine ||
-                            visita.image ||
+                            visit.image ||
+                            visit.immagine ||
                             config?.defaultCardImage ||
                             "/img/default_item_image.jpg"
                           }
-                          alt={visita.title}
+                          alt={visit.title}
                         />
                         <span className="card-badge">PROPRIETÀ</span>
                       </div>
-                      <h3>{visita.title || visita.titolo}</h3>
+                      <h3>{visit.title || visit.titolo}</h3>
                       <p>
-                        {visita.duration} • {numStops}{" "}
-                        {numStops === 1 ? "stop" : "stops"}
+                        {visit.duration} • {stopsCount}{" "}
+                        {stopsCount === 1 ? "stop" : "stops"}
                       </p>
                     </div>
                   );

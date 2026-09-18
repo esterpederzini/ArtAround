@@ -26,8 +26,9 @@ const NavigatorLogin = ({ isOpen, onClose }) => {
       });
 
       const json = await response.json();
+      const isSuccessful = json.success ?? json.successo;
 
-      if (json.successo) {
+      if (isSuccessful) {
         const userData = json?.data?.user || json?.data;
         const token = json?.data?.token || null;
         const sessionData = {
@@ -43,7 +44,7 @@ const NavigatorLogin = ({ isOpen, onClose }) => {
         onClose();
         window.location.reload();
       } else {
-        setError(json.messaggio || "Credenziali non valide");
+        setError(json.message || json.messaggio || "Credenziali non valide");
       }
     } catch (err) {
       setError("Errore di connessione al server");
